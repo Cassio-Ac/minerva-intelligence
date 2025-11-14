@@ -72,3 +72,35 @@ Veja detalhes completos em [docs/FORK_HISTORY.md](docs/FORK_HISTORY.md).
 
 **Forked from**: [Dashboard AI v2.0](https://github.com/seu-usuario/dashboard-ai-v2)  
 **Fork Date**: 2025-01-14
+
+---
+
+## ⚠️ Executando com Dashboard AI v2 Simultaneamente
+
+Se você também tem o **Dashboard AI v2** rodando e quer executar ambos os projetos ao mesmo tempo, veja o guia completo:
+
+📖 **[Guia: Rodando Intelligence Platform e Dashboard AI v2 juntos](docs/RUNNING_WITH_DASHBOARD_AI.md)**
+
+### Resumo rápido:
+
+**Portas usadas pelo Intelligence Platform:**
+- Backend: `8001` (Dashboard AI usa 8000)
+- PostgreSQL: `5433` (Dashboard AI usa 5432)
+- Redis: `6380` (Dashboard AI usa 6379)
+- Frontend: `5174` (Dashboard AI usa 5173)
+
+**Iniciar ambos:**
+```bash
+# Terminal 1 - Dashboard AI
+cd /Users/angellocassio/Downloads/dashboard-ai-v2
+docker-compose up
+
+# Terminal 2 - Intelligence Platform
+cd ~/Documents/intelligence-platform
+docker-compose up
+```
+
+**URLs:**
+- Dashboard AI: http://localhost:8000
+- Intelligence Platform: http://localhost:8001
+

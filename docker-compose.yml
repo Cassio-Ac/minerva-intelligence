@@ -4,7 +4,7 @@ services:
     image: postgres:16-alpine
     container_name: intelligence-platform-postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       POSTGRES_USER: intelligence_user
       POSTGRES_PASSWORD: intelligence_pass_secure_2024
@@ -26,7 +26,7 @@ services:
     image: redis:7-alpine
     container_name: intelligence-platform-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     networks:
       - intelligence-network
     healthcheck:
@@ -43,7 +43,7 @@ services:
       dockerfile: Dockerfile
     container_name: intelligence-platform-backend
     ports:
-      - "8000:8000"
+      - "8001:8000"
     env_file:
       - ./backend/.env
     environment:
