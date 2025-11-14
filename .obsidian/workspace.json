@@ -1,0 +1,195 @@
+{
+  "main": {
+    "id": "f41e56f2c9bd5777",
+    "type": "split",
+    "children": [
+      {
+        "id": "9a31e6e07bc8a5d4",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4849cdb87dfa849c",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "apresentacao/DIAGRAMAS.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "DIAGRAMAS"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "4935bdf8ec71f44c",
+    "type": "split",
+    "children": [
+      {
+        "id": "d7192ba2f8340e40",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4da75527fb26165f",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Explorador de arquivos"
+            }
+          },
+          {
+            "id": "531d5af63c90ddfc",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Procurar"
+            }
+          },
+          {
+            "id": "b0c9d099586df7ee",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Marcadores"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "841efef741c7e231",
+    "type": "split",
+    "children": [
+      {
+        "id": "3aae52337f090d58",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "3cd5695bc05f877b",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "apresentacao/04-ERROS-E-SOLUCOES.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Links inversos para 04-ERROS-E-SOLUCOES"
+            }
+          },
+          {
+            "id": "1f60f190a074dc9a",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "apresentacao/04-ERROS-E-SOLUCOES.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Links de saída para 04-ERROS-E-SOLUCOES"
+            }
+          },
+          {
+            "id": "bcc7a9f1a28460a8",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "1bb78a728c1332a2",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "apresentacao/04-ERROS-E-SOLUCOES.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Sumário de 04-ERROS-E-SOLUCOES"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Abrir a troca rápida": false,
+      "graph:Abrir visualização em gráfico": false,
+      "canvas:Criar novo canvas": false,
+      "daily-notes:Abrir a nota de hoje": false,
+      "templates:Inserir modelo": false,
+      "command-palette:Abrir paleta de comandos": false,
+      "bases:Criar nova base": false
+    }
+  },
+  "active": "4849cdb87dfa849c",
+  "lastOpenFiles": [
+    "frontend/src/components/WidgetEditModal.tsx",
+    "backend/static/downloads/dashboard_gvuln_20251113_180936.html",
+    "backend/static/downloads/dashboard_gvuln_20251113_180108.html",
+    "backend/static/downloads/dashboard_gvuln_20251113_171458.html",
+    "backend/static/downloads/dashboard_gvuln_20251113_170942.html",
+    "backend/static/downloads/dashboard_gvuln_20251113_170916.html",
+    "backend/static/downloads/dashboard_gvuln_20251113_170754.html",
+    "backend/static/downloads/dashboard_gvuln_20251113_170343.html",
+    "apresentacao/03-ARQUITETURA-TECNICA.md",
+    "apresentacao/DIAGRAMAS.md",
+    "apresentacao/00-GUIA-APRESENTACAO.md",
+    "apresentacao/06-INDICADORES-VULNERABILIDADES.md",
+    "apresentacao/README.md",
+    "apresentacao/02-CASOS-DE-USO.md",
+    "apresentacao/01-CRONOLOGIA-DETALHADA.md",
+    "apresentacao/04-ERROS-E-SOLUCOES.md",
+    "docs/CSV_UPLOAD_E_OPERATOR_ROLE.md",
+    "frontend/THEME_SYSTEM.md",
+    "ARCHITECTURE.md",
+    "TECHNICAL_DETAILS.md"
+  ]
+}

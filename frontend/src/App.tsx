@@ -1,0 +1,135 @@
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
+import { DashboardEditor } from '@pages/DashboardEditor'
+import DashboardList from './pages/DashboardList'
+import { ESServersManager } from '@pages/ESServersManager'
+import { ChatPage } from '@pages/ChatPage'
+import { SettingsPage } from '@pages/SettingsPage'
+import { LoginPage } from '@pages/LoginPage'
+import SSOCallbackPage from '@pages/SSOCallbackPage'
+import { ProfilePage } from '@pages/ProfilePage'
+import { DownloadsPage } from '@pages/DownloadsPage'
+import { CSVUploadPage } from '@pages/CSVUploadPage'
+import { HomePage } from '@pages/HomePage'
+import { Header } from './components/Header'
+import { useDashboardStore } from '@stores/dashboardStore'
+import { useSettingsStore } from '@stores/settingsStore'
+import { useAuthStore } from '@stores/authStore'
+
+// Protected Route Component
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuthStore()
+
+  if (isLoading) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', width: '100vw', maxWidth: '100vw', overflow: 'hidden' }}>
+      <div>Carregando...</div>
+    </div>
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <>{children}</>
+}
+
+// Admin-only Route Component
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading, user } = useAuthStore()
+
+  if (isLoading) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', width: '100vw', maxWidth: '100vw', overflow: 'hidden' }}>
+      <div>Carregando...</div>
+    </div>
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (!user?.can_configure_system) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', width: '100vw', maxWidth: '100vw', overflow: 'hidden', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ fontSize: '48px' }}>🔒</div>
+      <div style={{ fontSize: '24px', fontWeight: '600' }}>Acesso Negado</div>
+      <div style={{ fontSize: '14px', color: '#6b7280' }}>Você não tem permissão para acessar esta página.</div>
+      <Link to="/" style={{ marginTop: '16px', padding: '8px 16px', backgroundColor: '#3b82f6', color: '#ffffff', borderRadius: '8px', textDecoration: 'none' }}>
+        Voltar para Home
+      </Link>
+    </div>
+  }
+
+  return <>{children}</>
+}
+
+function App() {
+  const initializeWebSocket = useDashboardStore((state) => state.initializeWebSocket)
+  const disconnectWebSocket = useDashboardStore((state) => state.disconnectWebSocket)
+  const { currentColors } = useSettingsStore()
+  const { isAuthenticated } = useAuthStore()
+
+  // Inicializar WebSocket quando app monta
+  useEffect(() => {
+    if (isAuthenticated) {
+      initializeWebSocket()
+    }
+
+    // Cleanup: desconectar quando app desmonta
+    return () => {
+      disconnectWebSocket()
+    }
+  }, [isAuthenticated])
+
+  return (
+    <BrowserRouter>
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100%', maxWidth: '100vw', overflow: 'hidden' }}>
+        <Header />
+        <main style={{ flex: 1, width: '100%', maxWidth: '100vw', overflow: 'hidden' }}>
+          <Routes>
+        {/* Login */}
+        <Route path="/login" element={<LoginPage />} />
+
+        {/* SSO Callback */}
+        <Route path="/sso-callback" element={<SSOCallbackPage />} />
+
+        {/* Home */}
+        <Route path="/" element={
+          <ProtectedRoute>
+            <HomePage />
+          </ProtectedRoute>
+        } />
+
+        {/* Dashboard List */}
+        <Route path="/dashboards" element={<ProtectedRoute><DashboardList /></ProtectedRoute>} />
+
+        {/* Dashboard Editor */}
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardEditor /></ProtectedRoute>} />
+
+        {/* Chat Page */}
+        <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+
+        {/* Profile Page */}
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+
+        {/* Downloads Page */}
+        <Route path="/downloads" element={<ProtectedRoute><DownloadsPage /></ProtectedRoute>} />
+
+        {/* CSV Upload Page */}
+        <Route path="/csv-upload" element={<ProtectedRoute><CSVUploadPage /></ProtectedRoute>} />
+
+        {/* ES Servers Manager */}
+        <Route path="/servers" element={<AdminRoute><ESServersManager /></AdminRoute>} />
+
+        {/* Settings */}
+        <Route path="/settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
+
+        {/* 404 */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+        </main>
+      </div>
+    </BrowserRouter>
+  )
+}
+
+export default App
+
