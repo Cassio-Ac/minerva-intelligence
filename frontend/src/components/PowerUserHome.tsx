@@ -1,13 +1,13 @@
 /**
  * PowerUserHome Component
- * Home page para power users com histórico de mensagens e dashboards salvos
+ * Home page para power users e operators com acesso aos módulos de inteligência
  */
 
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSettingsStore } from '@stores/settingsStore';
 import { useAuthStore } from '@stores/authStore';
-import { API_URL, API_BASE_URL } from '../config/api';
+import { API_URL } from '../config/api';
 
 interface Conversation {
   id: string;
@@ -16,20 +16,10 @@ interface Conversation {
   message_count: number;
 }
 
-interface Dashboard {
-  id: string;
-  title: string;
-  description: string;
-  created_at: string;
-  updated_at: string;
-  widgets_count: number;
-}
-
 export const PowerUserHome: React.FC = () => {
   const { currentColors } = useSettingsStore();
   const { token, user } = useAuthStore();
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,15 +32,6 @@ export const PowerUserHome: React.FC = () => {
         if (convResponse.ok) {
           const convData = await convResponse.json();
           setConversations(convData);
-        }
-
-        // Buscar dashboards do usuário
-        const dashResponse = await fetch(`${API_URL}/dashboards?limit=6`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (dashResponse.ok) {
-          const dashData = await dashResponse.json();
-          setDashboards(dashData);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -85,10 +66,10 @@ export const PowerUserHome: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold mb-2" style={{ color: currentColors.text.primary }}>
-              Bem-vindo de volta!
+              🧠 Minerva Intelligence
             </h1>
             <p className="text-lg" style={{ color: currentColors.text.secondary }}>
-              Olá, {user?.full_name || user?.username} 👋
+              Bem-vindo, {user?.full_name || user?.username} · {user?.role === 'operator' ? 'Operador' : 'Power User'}
             </p>
           </div>
           <div className="text-6xl">
@@ -97,215 +78,227 @@ export const PowerUserHome: React.FC = () => {
         </div>
       </div>
 
-      {/* Ações Rápidas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Link
-          to="/chat"
-          className="rounded-xl p-6 shadow-lg hover:shadow-xl transition-all border"
-          style={{
-            backgroundColor: currentColors.bg.primary,
-            borderColor: currentColors.accent.primary
-          }}
-        >
-          <div className="text-4xl mb-3">💬</div>
-          <h3 className="text-lg font-semibold mb-2" style={{ color: currentColors.text.primary }}>
-            Novo Chat
-          </h3>
-          <p className="text-sm" style={{ color: currentColors.text.muted }}>
-            Criar dashboards com IA
-          </p>
-        </Link>
+      {/* Módulos de Inteligência */}
+      <div className="rounded-2xl shadow-xl p-8" style={{
+        backgroundColor: currentColors.bg.primary
+      }}>
+        <h2 className="text-2xl font-bold mb-6" style={{ color: currentColors.text.primary }}>
+          🎯 Módulos de Inteligência
+        </h2>
 
-        <Link
-          to="/dashboards"
-          className="rounded-xl p-6 shadow-lg hover:shadow-xl transition-all border"
-          style={{
-            backgroundColor: currentColors.bg.primary,
-            borderColor: currentColors.accent.primary
-          }}
-        >
-          <div className="text-4xl mb-3">📊</div>
-          <h3 className="text-lg font-semibold mb-2" style={{ color: currentColors.text.primary }}>
-            Meus Dashboards
-          </h3>
-          <p className="text-sm" style={{ color: currentColors.text.muted }}>
-            Ver todos os dashboards
-          </p>
-        </Link>
-
-        {user?.can_upload_csv && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link
-            to="/csv-upload"
-            className="rounded-xl p-6 shadow-lg hover:shadow-xl transition-all border"
+            to="/rss"
+            className="rounded-xl p-6 border hover:shadow-lg transition-all"
             style={{
-              backgroundColor: currentColors.bg.primary,
-              borderColor: currentColors.accent.primary
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
             }}
           >
-            <div className="text-4xl mb-3">📤</div>
-            <h3 className="text-lg font-semibold mb-2" style={{ color: currentColors.text.primary }}>
-              Upload CSV
+            <div className="text-4xl mb-3">📡</div>
+            <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
+              RSS Intelligence
             </h3>
             <p className="text-sm" style={{ color: currentColors.text.muted }}>
-              Importar dados
+              800+ artigos, 38 fontes, chat RAG
             </p>
           </Link>
-        )}
 
-        <Link
-          to="/downloads"
-          className="rounded-xl p-6 shadow-lg hover:shadow-xl transition-all border"
-          style={{
-            backgroundColor: currentColors.bg.primary,
-            borderColor: currentColors.accent.primary
-          }}
-        >
-          <div className="text-4xl mb-3">📥</div>
-          <h3 className="text-lg font-semibold mb-2" style={{ color: currentColors.text.primary }}>
-            Downloads
-          </h3>
-          <p className="text-sm" style={{ color: currentColors.text.muted }}>
-            Arquivos exportados
-          </p>
-        </Link>
+          <Link
+            to="/telegram"
+            className="rounded-xl p-6 border hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}
+          >
+            <div className="text-4xl mb-3">💬</div>
+            <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
+              Telegram Intelligence
+            </h3>
+            <p className="text-sm" style={{ color: currentColors.text.muted }}>
+              150+ grupos, busca, análise temporal
+            </p>
+          </Link>
+
+          <Link
+            to="/cve"
+            className="rounded-xl p-6 border hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}
+          >
+            <div className="text-4xl mb-3">🔒</div>
+            <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
+              CVE Intelligence
+            </h3>
+            <p className="text-sm" style={{ color: currentColors.text.muted }}>
+              Tracking de vulnerabilidades
+            </p>
+          </Link>
+
+          <Link
+            to="/breaches"
+            className="rounded-xl p-6 border hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}
+          >
+            <div className="text-4xl mb-3">🚨</div>
+            <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
+              Data Breaches
+            </h3>
+            <p className="text-sm" style={{ color: currentColors.text.muted }}>
+              Análise de vazamentos de dados
+            </p>
+          </Link>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Histórico de Conversas */}
-        <div className="rounded-2xl shadow-xl p-6" style={{
-          backgroundColor: currentColors.bg.primary
-        }}>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold" style={{ color: currentColors.text.primary }}>
-              💬 Conversas Recentes
-            </h2>
+      {/* Ferramentas e Ações */}
+      <div className="rounded-2xl shadow-xl p-8" style={{
+        backgroundColor: currentColors.bg.primary
+      }}>
+        <h2 className="text-2xl font-bold mb-6" style={{ color: currentColors.text.primary }}>
+          🛠️ Ferramentas
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Link
+            to="/chat"
+            className="rounded-xl p-6 border hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}
+          >
+            <div className="text-4xl mb-3">🤖</div>
+            <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
+              Chat com IA
+            </h3>
+            <p className="text-sm" style={{ color: currentColors.text.muted }}>
+              Análise e insights com LLM
+            </p>
+          </Link>
+
+          <Link
+            to="/knowledge"
+            className="rounded-xl p-6 border hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}
+          >
+            <div className="text-4xl mb-3">📚</div>
+            <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
+              Knowledge Base
+            </h3>
+            <p className="text-sm" style={{ color: currentColors.text.muted }}>
+              Documentos e chunks para RAG
+            </p>
+          </Link>
+
+          <Link
+            to="/dashboards"
+            className="rounded-xl p-6 border hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}
+          >
+            <div className="text-4xl mb-3">📊</div>
+            <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
+              Dashboards
+            </h3>
+            <p className="text-sm" style={{ color: currentColors.text.muted }}>
+              Visualizações personalizadas
+            </p>
+          </Link>
+
+          <Link
+            to="/downloads"
+            className="rounded-xl p-6 border hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}
+          >
+            <div className="text-4xl mb-3">📥</div>
+            <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
+              Downloads
+            </h3>
+            <p className="text-sm" style={{ color: currentColors.text.muted }}>
+              Arquivos exportados
+            </p>
+          </Link>
+        </div>
+      </div>
+
+      {/* Atividade Recente */}
+      <div className="rounded-2xl shadow-xl p-8" style={{
+        backgroundColor: currentColors.bg.primary
+      }}>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold" style={{ color: currentColors.text.primary }}>
+            💬 Conversas com IA Recentes
+          </h2>
+          <Link
+            to="/chat"
+            className="text-sm hover:underline"
+            style={{ color: currentColors.accent.primary }}
+          >
+            Ver todas
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-8" style={{ color: currentColors.text.muted }}>
+            Carregando...
+          </div>
+        ) : conversations.length === 0 ? (
+          <div className="text-center py-8" style={{ color: currentColors.text.muted }}>
+            <div className="text-4xl mb-3">📭</div>
+            <p className="mb-4">Nenhuma conversa ainda</p>
             <Link
               to="/chat"
-              className="text-sm hover:underline"
-              style={{ color: currentColors.accent.primary }}
+              className="inline-block px-6 py-3 rounded-lg font-medium"
+              style={{
+                backgroundColor: currentColors.accent.primary,
+                color: currentColors.text.inverse
+              }}
             >
-              Ver todas
+              Iniciar nova conversa
             </Link>
           </div>
-
-          {loading ? (
-            <div className="text-center py-8" style={{ color: currentColors.text.muted }}>
-              Carregando...
-            </div>
-          ) : conversations.length === 0 ? (
-            <div className="text-center py-8" style={{ color: currentColors.text.muted }}>
-              <div className="text-4xl mb-3">📭</div>
-              <p>Nenhuma conversa ainda</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {conversations.map((conv) => (
               <Link
-                to="/chat"
-                className="inline-block mt-4 px-4 py-2 rounded-lg"
+                key={conv.id}
+                to={`/chat?conversation=${conv.id}`}
+                className="block rounded-lg p-5 border hover:shadow-md transition-all"
                 style={{
-                  backgroundColor: currentColors.accent.primary,
-                  color: currentColors.text.inverse
+                  backgroundColor: currentColors.bg.tertiary,
+                  borderColor: currentColors.border.default
                 }}
               >
-                Iniciar conversa
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {conversations.map((conv) => (
-                <Link
-                  key={conv.id}
-                  to={`/chat?conversation=${conv.id}`}
-                  className="block rounded-lg p-4 border hover:shadow-md transition-all"
-                  style={{
-                    backgroundColor: currentColors.bg.tertiary,
-                    borderColor: currentColors.border.default
-                  }}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold mb-1" style={{ color: currentColors.text.primary }}>
-                        {conv.title || 'Sem título'}
-                      </h3>
-                      <p className="text-sm" style={{ color: currentColors.text.muted }}>
-                        {conv.message_count} mensagens
-                      </p>
-                    </div>
-                    <span className="text-xs whitespace-nowrap ml-4" style={{ color: currentColors.text.muted }}>
-                      {formatDate(conv.created_at)}
-                    </span>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
+                      {conv.title || 'Sem título'}
+                    </h3>
+                    <p className="text-sm" style={{ color: currentColors.text.muted }}>
+                      {conv.message_count} mensagens · {formatDate(conv.created_at)}
+                    </p>
                   </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Dashboards Salvos */}
-        <div className="rounded-2xl shadow-xl p-6" style={{
-          backgroundColor: currentColors.bg.primary
-        }}>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold" style={{ color: currentColors.text.primary }}>
-              📊 Meus Dashboards
-            </h2>
-            <Link
-              to="/dashboards"
-              className="text-sm hover:underline"
-              style={{ color: currentColors.accent.primary }}
-            >
-              Ver todos
-            </Link>
+                  <div className="text-2xl ml-4">💬</div>
+                </div>
+              </Link>
+            ))}
           </div>
-
-          {loading ? (
-            <div className="text-center py-8" style={{ color: currentColors.text.muted }}>
-              Carregando...
-            </div>
-          ) : dashboards.length === 0 ? (
-            <div className="text-center py-8" style={{ color: currentColors.text.muted }}>
-              <div className="text-4xl mb-3">📊</div>
-              <p>Nenhum dashboard criado</p>
-              <Link
-                to="/chat"
-                className="inline-block mt-4 px-4 py-2 rounded-lg"
-                style={{
-                  backgroundColor: currentColors.accent.primary,
-                  color: currentColors.text.inverse
-                }}
-              >
-                Criar dashboard
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {dashboards.map((dash) => (
-                <Link
-                  key={dash.id}
-                  to={`/dashboard?id=${dash.id}`}
-                  className="block rounded-lg p-4 border hover:shadow-md transition-all"
-                  style={{
-                    backgroundColor: currentColors.bg.tertiary,
-                    borderColor: currentColors.border.default
-                  }}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold mb-1" style={{ color: currentColors.text.primary }}>
-                        {dash.title}
-                      </h3>
-                      <p className="text-sm mb-2" style={{ color: currentColors.text.muted }}>
-                        {dash.description || 'Sem descrição'}
-                      </p>
-                      <div className="flex items-center gap-3 text-xs" style={{ color: currentColors.text.muted }}>
-                        <span>{dash.widgets_count || 0} widgets</span>
-                        <span>•</span>
-                        <span>Atualizado {formatDate(dash.updated_at)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

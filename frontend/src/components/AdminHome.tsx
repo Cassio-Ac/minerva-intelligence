@@ -1,6 +1,6 @@
 /**
  * AdminHome Component
- * Home page para administradores com métricas do sistema
+ * Home page para administradores com métricas do Intelligence Platform
  */
 
 import React, { useEffect, useState } from 'react';
@@ -58,10 +58,10 @@ export const AdminHome: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold mb-2" style={{ color: currentColors.text.primary }}>
-              Painel Administrativo
+              🧠 Minerva - Intelligence Platform
             </h1>
             <p className="text-lg" style={{ color: currentColors.text.secondary }}>
-              Bem-vindo, {user?.full_name || user?.username} 👋
+              Bem-vindo, {user?.full_name || user?.username} · Administrador
             </p>
           </div>
           <div className="text-6xl">
@@ -98,48 +98,6 @@ export const AdminHome: React.FC = () => {
               </div>
             </div>
 
-            {/* Total de Dashboards */}
-            <div className="rounded-xl p-6 border" style={{
-              backgroundColor: currentColors.bg.tertiary,
-              borderColor: currentColors.border.default
-            }}>
-              <div className="text-3xl mb-2">📊</div>
-              <div className="text-3xl font-bold mb-1" style={{ color: currentColors.accent.primary }}>
-                {metrics?.total_dashboards || 0}
-              </div>
-              <div className="text-sm" style={{ color: currentColors.text.muted }}>
-                Dashboards Criados
-              </div>
-            </div>
-
-            {/* Conversas com IA */}
-            <div className="rounded-xl p-6 border" style={{
-              backgroundColor: currentColors.bg.tertiary,
-              borderColor: currentColors.border.default
-            }}>
-              <div className="text-3xl mb-2">💬</div>
-              <div className="text-3xl font-bold mb-1" style={{ color: currentColors.accent.primary }}>
-                {metrics?.total_conversations || 0}
-              </div>
-              <div className="text-sm" style={{ color: currentColors.text.muted }}>
-                Conversas com IA
-              </div>
-            </div>
-
-            {/* Downloads */}
-            <div className="rounded-xl p-6 border" style={{
-              backgroundColor: currentColors.bg.tertiary,
-              borderColor: currentColors.border.default
-            }}>
-              <div className="text-3xl mb-2">📥</div>
-              <div className="text-3xl font-bold mb-1" style={{ color: currentColors.accent.primary }}>
-                {metrics?.total_downloads || 0}
-              </div>
-              <div className="text-sm" style={{ color: currentColors.text.muted }}>
-                Downloads Gerados
-              </div>
-            </div>
-
             {/* Usuários Ativos Hoje */}
             <div className="rounded-xl p-6 border" style={{
               backgroundColor: currentColors.bg.tertiary,
@@ -168,6 +126,34 @@ export const AdminHome: React.FC = () => {
               </div>
             </div>
 
+            {/* Conversas com IA */}
+            <div className="rounded-xl p-6 border" style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}>
+              <div className="text-3xl mb-2">💬</div>
+              <div className="text-3xl font-bold mb-1" style={{ color: currentColors.accent.primary }}>
+                {metrics?.total_conversations || 0}
+              </div>
+              <div className="text-sm" style={{ color: currentColors.text.muted }}>
+                Conversas com IA
+              </div>
+            </div>
+
+            {/* Provedores LLM */}
+            <div className="rounded-xl p-6 border" style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}>
+              <div className="text-3xl mb-2">🧠</div>
+              <div className="text-3xl font-bold mb-1" style={{ color: currentColors.accent.primary }}>
+                {metrics?.llm_providers_count || 0}
+              </div>
+              <div className="text-sm" style={{ color: currentColors.text.muted }}>
+                Provedores LLM
+              </div>
+            </div>
+
             {/* Servidores MCP */}
             <div className="rounded-xl p-6 border" style={{
               backgroundColor: currentColors.bg.tertiary,
@@ -182,29 +168,122 @@ export const AdminHome: React.FC = () => {
               </div>
             </div>
 
-            {/* LLM Providers */}
+            {/* Dashboards */}
             <div className="rounded-xl p-6 border" style={{
               backgroundColor: currentColors.bg.tertiary,
               borderColor: currentColors.border.default
             }}>
-              <div className="text-3xl mb-2">🧠</div>
+              <div className="text-3xl mb-2">📊</div>
               <div className="text-3xl font-bold mb-1" style={{ color: currentColors.accent.primary }}>
-                {metrics?.llm_providers_count || 0}
+                {metrics?.total_dashboards || 0}
               </div>
               <div className="text-sm" style={{ color: currentColors.text.muted }}>
-                Provedores LLM
+                Dashboards
+              </div>
+            </div>
+
+            {/* Downloads */}
+            <div className="rounded-xl p-6 border" style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}>
+              <div className="text-3xl mb-2">📥</div>
+              <div className="text-3xl font-bold mb-1" style={{ color: currentColors.accent.primary }}>
+                {metrics?.total_downloads || 0}
+              </div>
+              <div className="text-sm" style={{ color: currentColors.text.muted }}>
+                Downloads Gerados
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Ações Rápidas */}
+      {/* Módulos de Inteligência */}
       <div className="rounded-2xl shadow-xl p-8" style={{
         backgroundColor: currentColors.bg.primary
       }}>
         <h2 className="text-2xl font-bold mb-6" style={{ color: currentColors.text.primary }}>
-          ⚡ Ações Rápidas
+          🎯 Módulos de Inteligência
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Link
+            to="/rss"
+            className="rounded-xl p-6 border hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}
+          >
+            <div className="text-4xl mb-3">📡</div>
+            <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
+              RSS Intelligence
+            </h3>
+            <p className="text-sm" style={{ color: currentColors.text.muted }}>
+              800+ artigos, 38 fontes, chat RAG
+            </p>
+          </Link>
+
+          <Link
+            to="/telegram"
+            className="rounded-xl p-6 border hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}
+          >
+            <div className="text-4xl mb-3">💬</div>
+            <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
+              Telegram Intelligence
+            </h3>
+            <p className="text-sm" style={{ color: currentColors.text.muted }}>
+              150+ grupos, busca, análise temporal
+            </p>
+          </Link>
+
+          <Link
+            to="/cve"
+            className="rounded-xl p-6 border hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}
+          >
+            <div className="text-4xl mb-3">🔒</div>
+            <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
+              CVE Intelligence
+            </h3>
+            <p className="text-sm" style={{ color: currentColors.text.muted }}>
+              Tracking de vulnerabilidades
+            </p>
+          </Link>
+
+          <Link
+            to="/breaches"
+            className="rounded-xl p-6 border hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.tertiary,
+              borderColor: currentColors.border.default
+            }}
+          >
+            <div className="text-4xl mb-3">🚨</div>
+            <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
+              Data Breaches
+            </h3>
+            <p className="text-sm" style={{ color: currentColors.text.muted }}>
+              Análise de vazamentos de dados
+            </p>
+          </Link>
+        </div>
+      </div>
+
+      {/* Ações Administrativas */}
+      <div className="rounded-2xl shadow-xl p-8" style={{
+        backgroundColor: currentColors.bg.primary
+      }}>
+        <h2 className="text-2xl font-bold mb-6" style={{ color: currentColors.text.primary }}>
+          ⚡ Ações Administrativas
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -221,7 +300,7 @@ export const AdminHome: React.FC = () => {
               Configurações
             </h3>
             <p className="text-sm" style={{ color: currentColors.text.muted }}>
-              Gerenciar provedores LLM e sistema
+              LLM, MCP, SSO, usuários e sistema
             </p>
           </Link>
 
@@ -243,19 +322,19 @@ export const AdminHome: React.FC = () => {
           </Link>
 
           <Link
-            to="/dashboards"
+            to="/knowledge"
             className="rounded-xl p-6 border hover:shadow-lg transition-all"
             style={{
               backgroundColor: currentColors.bg.tertiary,
               borderColor: currentColors.border.default
             }}
           >
-            <div className="text-4xl mb-3">📊</div>
+            <div className="text-4xl mb-3">📚</div>
             <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
-              Dashboards
+              Knowledge Base
             </h3>
             <p className="text-sm" style={{ color: currentColors.text.muted }}>
-              Ver todos os dashboards
+              Documentos e chunks para RAG
             </p>
           </Link>
 
@@ -267,12 +346,12 @@ export const AdminHome: React.FC = () => {
               borderColor: currentColors.border.default
             }}
           >
-            <div className="text-4xl mb-3">💬</div>
+            <div className="text-4xl mb-3">🤖</div>
             <h3 className="font-semibold mb-2" style={{ color: currentColors.text.primary }}>
               Chat com IA
             </h3>
             <p className="text-sm" style={{ color: currentColors.text.muted }}>
-              Criar dashboards com IA
+              Análise e insights com LLM
             </p>
           </Link>
         </div>
