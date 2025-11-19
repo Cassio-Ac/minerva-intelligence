@@ -81,6 +81,8 @@ class TelegramMessageContextResponse(BaseModel):
     messages: List[Dict[str, Any]] = Field(default_factory=list, description="Mensagens do contexto")
     selected_message_id: int = Field(..., description="ID da mensagem selecionada")
     selected_index: Optional[int] = Field(None, description="Índice da mensagem selecionada na lista")
+    group_title: Optional[str] = Field(None, description="Título do grupo")
+    group_username: Optional[str] = Field(None, description="Username do grupo")
 
 
 # ==================== Statistics Schemas ====================

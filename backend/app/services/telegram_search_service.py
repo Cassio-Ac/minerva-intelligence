@@ -277,11 +277,26 @@ class TelegramSearchService:
 
             contexto = todas[inicio:fim]
 
+            # Extract group info from first message
+            group_title = None
+            group_username = None
+            if contexto and len(contexto) > 0:
+                first_msg = contexto[0]['_source']
+                group_info = first_msg.get('group_info', {})
+                group_title = group_info.get('group_title')
+                group_username = group_info.get('group_username')
+
+                # If not found in message, extract from index name
+                if not group_username:
+                    group_username = index_name.replace('telegram_messages_', '')
+
             return {
                 "total": len(contexto),
                 "messages": contexto,
                 "selected_message_id": msg_id,
-                "selected_index": idx_selecionada - inicio
+                "selected_index": idx_selecionada - inicio,
+                "group_title": group_title,
+                "group_username": group_username
             }
 
         except Exception as e:

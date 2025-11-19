@@ -69,6 +69,8 @@ interface ConversationContext {
   messages: TelegramMessage[];
   selected_message_id: number;
   selected_index?: number;
+  group_title?: string;
+  group_username?: string;
 }
 
 const TelegramIntelligence: React.FC = () => {
@@ -749,9 +751,16 @@ const TelegramIntelligence: React.FC = () => {
               alignItems: 'center',
               marginBottom: '20px'
             }}>
-              <h3 style={{ margin: 0, color: currentColors.text.primary }}>
-                Contexto da Conversa
-              </h3>
+              <div>
+                <h3 style={{ margin: 0, marginBottom: '4px', color: currentColors.text.primary }}>
+                  Contexto da Conversa
+                </h3>
+                {modalContext?.group_title && (
+                  <p style={{ margin: 0, fontSize: '14px', color: currentColors.text.secondary }}>
+                    Grupo: {modalContext.group_title} ({modalContext.group_username || 'sem username'})
+                  </p>
+                )}
+              </div>
               <button
                 onClick={() => setShowModal(false)}
                 style={{

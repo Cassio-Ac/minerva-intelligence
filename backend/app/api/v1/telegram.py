@@ -156,7 +156,9 @@ async def get_message_context(
             total=result['total'],
             messages=[hit['_source'] for hit in result['messages']],
             selected_message_id=result['selected_message_id'],
-            selected_index=result.get('selected_index')
+            selected_index=result.get('selected_index'),
+            group_title=result.get('group_title'),
+            group_username=result.get('group_username')
         )
 
     except Exception as e:
