@@ -171,12 +171,21 @@ PostgreSQL  Redis  Elasticsearch  LLM APIs
 
 ## 📖 Documentação
 
-### 📘 Guias de Uso
+### 🚀 Começando
+
+- [⚡ Quick Start](docs/QUICK_START.md)
+- [🏗️ Architecture](docs/ARCHITECTURE.md)
+- [💻 Development Guide](docs/DEVELOPMENT.md)
+
+### 📘 Módulos e Features
 
 - [📡 RSS Intelligence - Resumo Completo](docs/RESUMO_RSS_INTELLIGENCE.md)
 - [💬 Telegram Intelligence - Fixes & Features](docs/TELEGRAM_INTELLIGENCE_FIXES.md)
-- [🔌 Configurar MCP (Model Context Protocol)](docs/CONFIGURE_MCP.md)
-- [📝 Resumo da Sessão 2025-11-18](docs/SESSION_SUMMARY_2025-11-18.md)
+- [🔌 MCP System Overview](docs/MCP_SYSTEM.md)
+- [🔌 Configurar MCP](docs/CONFIGURE_MCP.md)
+- [🔍 GVULN MCP Integration](docs/GVULN_MCP_INTEGRATION.md)
+- [📚 Knowledge Base System](docs/KNOWLEDGE_BASE_SYSTEM.md)
+- [🔗 Knowledge Integration Complete](docs/KNOWLEDGE_INTEGRATION_COMPLETE.md)
 
 ### 🔧 Guias Técnicos
 
@@ -185,10 +194,20 @@ PostgreSQL  Redis  Elasticsearch  LLM APIs
 - [🔨 Pipelines & Rotinas](docs/PIPELINES_README.md)
 - [📦 MCP RSS Server](docs/MCP_RSS_README.md)
 - [🔁 Rotinas de Manutenção](docs/ROTINAS.md)
+- [🔧 Technical Details](docs/TECHNICAL_DETAILS.md)
+
+### 📊 Planejamento e Status
+
+- [📊 Project Status](docs/PROJECT_STATUS.md)
+- [🗺️ Roadmap](docs/ROADMAP.md)
+- [♻️ Refactoring Plan](docs/REFACTORING_PLAN.md)
+- [📚 Lessons Learned](docs/LESSONS_LEARNED.md)
+- [📝 Changelog](docs/CHANGELOG.md)
 
 ### 📤 Git & Deploy
 
 - [📤 Git Push Instructions](docs/GIT_PUSH_INSTRUCTIONS.md)
+- [📝 Session Summary 2025-11-18](docs/SESSION_SUMMARY_2025-11-18.md)
 
 ---
 
