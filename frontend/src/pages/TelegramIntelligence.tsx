@@ -179,14 +179,15 @@ const TelegramIntelligence: React.FC = () => {
   // Handle message click to show context
   const handleMessageClick = async (message: TelegramMessage) => {
     console.log('Message clicked:', message);
-    // Priority order:
-    // 1. _actual_group_username (from backend search, comes from ES _index) - most reliable
-    // 2. _actualGroupUsername (from frontend when viewing group) - also reliable
-    // 3. group_info.group_username (from message metadata) - may be wrong for forwarded messages
-    const groupUsername = message._actual_group_username || message._actualGroupUsername || message.group_info?.group_username || 'unknown';
-    console.log('Using group username:', groupUsername);
-    // Normalize index name: add prefix and convert to lowercase
-    const indexName = `telegram_messages_${groupUsername.toLowerCase()}`;
+    console.log('group_info:', message.group_info);
+    console.log('_index:', (message as any)._index);
+    console.log('_actual_group_username:', message._actual_group_username);
+    console.log('_actualGroupUsername:', message._actualGroupUsername);
+
+    // Use the FULL index name from ES hit (like telegram_messages_puxadasgratis)
+    // This is the source of truth from Python script: index_name = msg_selecionada['_index']
+    const indexName = (message as any)._index ||
+                     `telegram_messages_${(message._actual_group_username || message._actualGroupUsername || 'unknown').toLowerCase()}`;
     const messageId = message.id;
     console.log('Using index:', indexName);
 
@@ -200,17 +201,44 @@ const TelegramIntelligence: React.FC = () => {
     setShowModal(true);
 
     try {
-      console.log('Fetching context for message:', messageId, 'in index:', indexName);
+      const groupId = message.group_info?.group_id;
+      console.log('Fetching context for message:', messageId, 'in index:', indexName, 'group_id:', groupId);
       const response = await api.get<ConversationContext>('/telegram/messages/context', {
         params: {
           index_name: indexName,
           msg_id: messageId,
+          group_id: groupId,  // Add group_id to filter correctly
           before: contextSize.before,
           after: contextSize.after
         }
       });
       console.log('Context response:', response.data);
-      setModalContext(response.data);
+      console.log('📊 CONTEXT DETAILS:');
+      console.log('  Total messages:', response.data.total);
+      console.log('  Selected message ID:', response.data.selected_message_id);
+      console.log('  Selected index in window:', response.data.selected_index);
+      console.log('  Group title:', response.data.group_title);
+      console.log('  Group username:', response.data.group_username);
+
+      // Log all messages in context
+      console.log('📝 MESSAGES IN CONTEXT:');
+      response.data.messages.forEach((msg: any, idx: number) => {
+        const isSelected = msg.id === response.data.selected_message_id;
+        const prefix = isSelected ? '🎯 SELECTED' : `   [${idx}]`;
+        console.log(`${prefix} ID: ${msg.id} | Date: ${msg.date} | Message: ${msg.message?.substring(0, 50)}...`);
+      });
+
+      // Override group_title with the one from clicked message, but keep index-based username
+      // The index name (groupUsername) is the source of truth for WHERE the message is stored
+      // The group_title from message metadata shows the display name
+      const contextWithTitle = {
+        ...response.data,
+        group_title: response.data.group_title || message.group_info?.group_title || null,
+        group_username: response.data.group_username  // Always use index-based username (v2, etc)
+      };
+
+      console.log('✅ Context with title override:', contextWithTitle);
+      setModalContext(contextWithTitle);
     } catch (error) {
       console.error('Error fetching context:', error);
     } finally {
@@ -755,9 +783,10 @@ const TelegramIntelligence: React.FC = () => {
                 <h3 style={{ margin: 0, marginBottom: '4px', color: currentColors.text.primary }}>
                   Contexto da Conversa
                 </h3>
-                {modalContext?.group_title && (
+                {modalContext?.group_username && (
                   <p style={{ margin: 0, fontSize: '14px', color: currentColors.text.secondary }}>
-                    Grupo: {modalContext.group_title} ({modalContext.group_username || 'sem username'})
+                    Grupo: {modalContext.group_title || modalContext.group_username}
+                    {modalContext.group_title && ` (@${modalContext.group_username})`}
                   </p>
                 )}
               </div>

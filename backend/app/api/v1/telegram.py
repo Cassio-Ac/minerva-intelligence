@@ -58,10 +58,11 @@ async def search_messages(
         messages_with_index = []
         for hit in result['hits']:
             msg = hit['_source']
-            # Extract group username from index name (telegram_messages_groupname)
+            # Keep the FULL index name (e.g., telegram_messages_puxadasgratis)
             index_name = hit['_index']
             group_username = index_name.replace('telegram_messages_', '')
-            msg['_actual_group_username'] = group_username
+            msg['_index'] = index_name  # FULL index name
+            msg['_actual_group_username'] = group_username  # Just the username part
             messages_with_index.append(msg)
 
         return TelegramMessageSearchResponse(
@@ -103,10 +104,11 @@ async def search_by_user(
         messages_with_index = []
         for hit in result['hits']:
             msg = hit['_source']
-            # Extract group username from index name (telegram_messages_groupname)
+            # Keep the FULL index name (e.g., telegram_messages_puxadasgratis)
             index_name = hit['_index']
             group_username = index_name.replace('telegram_messages_', '')
-            msg['_actual_group_username'] = group_username
+            msg['_index'] = index_name  # FULL index name
+            msg['_actual_group_username'] = group_username  # Just the username part
             messages_with_index.append(msg)
 
         return TelegramUserSearchResponse(
@@ -127,6 +129,7 @@ async def search_by_user(
 async def get_message_context(
     index_name: str = Query(..., description="Nome do índice"),
     msg_id: int = Query(..., description="ID da mensagem"),
+    group_id: Optional[int] = Query(None, description="ID do grupo (para filtrar em índices compartilhados)"),
     before: int = Query(10, ge=0, le=50, description="Mensagens antes"),
     after: int = Query(10, ge=0, le=50, description="Mensagens depois"),
     server_id: Optional[str] = Query(None, description="ID do servidor ES"),
@@ -147,6 +150,7 @@ async def get_message_context(
         result = await service.get_message_context(
             index_name=index_name,
             msg_id=msg_id,
+            group_id=group_id,
             before=before,
             after=after,
             server_id=server_id

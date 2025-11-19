@@ -17,6 +17,38 @@ INDEX_PATTERN = "telegram_messages_*"
 INDEX_INFO = "telegram_info"
 
 
+async def get_group_title_from_info(es, group_username: str) -> Optional[str]:
+    """
+    Busca o título do grupo no índice telegram_info
+
+    Args:
+        es: Cliente Elasticsearch
+        group_username: Username do grupo
+
+    Returns:
+        Título do grupo ou None se não encontrado
+    """
+    try:
+        response = await es.search(
+            index=INDEX_INFO,
+            body={
+                "query": {
+                    "term": {
+                        "username.keyword": group_username
+                    }
+                },
+                "size": 1
+            }
+        )
+
+        if response['hits']['total']['value'] > 0:
+            return response['hits']['hits'][0]['_source'].get('title')
+        return None
+    except Exception as e:
+        logger.warning(f"⚠️ Could not fetch group title from telegram_info: {e}")
+        return None
+
+
 class TelegramSearchService:
     """Service para busca e análise de mensagens do Telegram"""
 
@@ -217,6 +249,7 @@ class TelegramSearchService:
         self,
         index_name: str,
         msg_id: int,
+        group_id: Optional[int] = None,
         before: int = 10,
         after: int = 10,
         server_id: Optional[str] = None
@@ -227,6 +260,7 @@ class TelegramSearchService:
         Args:
             index_name: Nome do índice onde a mensagem está
             msg_id: ID da mensagem
+            group_id: ID do grupo (para filtrar em índices compartilhados)
             before: Quantidade de mensagens antes (padrão: 10)
             after: Quantidade de mensagens depois (padrão: 10)
             server_id: ID do servidor ES (opcional)
@@ -238,18 +272,34 @@ class TelegramSearchService:
             factory = ESClientFactory()
             es = await factory.get_client(server_id)
 
+            # Build query - filter by ID range AND group_id if provided
+            query = {
+                "bool": {
+                    "must": [
+                        {
+                            "range": {
+                                "id": {
+                                    "gte": msg_id - before * 2,
+                                    "lte": msg_id + after * 2
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+
+            # Add group_id filter if provided (important for shared indices like telegram_messages_v2)
+            if group_id is not None:
+                query["bool"]["must"].append({
+                    "term": {"group_info.group_id": group_id}
+                })
+                logger.info(f"📍 Filtering by group_id: {group_id}")
+
             # Buscar mensagens próximas por ID
             response = await es.search(
                 index=index_name,
                 body={
-                    "query": {
-                        "range": {
-                            "id": {
-                                "gte": msg_id - before * 2,
-                                "lte": msg_id + after * 2
-                            }
-                        }
-                    },
+                    "query": query,
                     "size": 500,
                     "sort": [{"date": "asc"}]
                 }
@@ -264,7 +314,10 @@ class TelegramSearchService:
                     idx_selecionada = i
                     break
 
+            logger.info(f"📍 Context search: msg_id={msg_id}, found at index={idx_selecionada}, total messages={len(todas)}")
+
             if idx_selecionada is None:
+                logger.warning(f"⚠️ Message {msg_id} not found in results!")
                 return {
                     "total": len(todas),
                     "messages": todas,
@@ -277,18 +330,44 @@ class TelegramSearchService:
 
             contexto = todas[inicio:fim]
 
-            # Extract group info from first message
-            group_title = None
-            group_username = None
-            if contexto and len(contexto) > 0:
-                first_msg = contexto[0]['_source']
-                group_info = first_msg.get('group_info', {})
-                group_title = group_info.get('group_title')
-                group_username = group_info.get('group_username')
+            logger.info(f"📍 Context window: inicio={inicio}, fim={fim}, selected_index_in_window={idx_selecionada - inicio}")
 
-                # If not found in message, extract from index name
-                if not group_username:
-                    group_username = index_name.replace('telegram_messages_', '')
+            # Extract group info
+            # ALWAYS use index_name as source of truth for group_username (reliable)
+            # Extract from index name: telegram_messages_groupname -> groupname
+            group_username = index_name.replace('telegram_messages_', '')
+
+            # Try to get group_title from telegram_info index first (most reliable)
+            group_title = await get_group_title_from_info(es, group_username)
+
+            if group_title:
+                logger.info(f"✅ Found group_title in telegram_info: {group_title} for username: {group_username}")
+            else:
+                # Fallback: Try to get group_title from any message in context that matches the correct group
+                logger.info(f"📍 Fallback: Looking for group_title in messages with username: {group_username}")
+                for idx, hit in enumerate(contexto):
+                    msg = hit['_source']
+                    group_info = msg.get('group_info', {})
+                    msg_username = group_info.get('group_username', '')
+                    msg_title = group_info.get('group_title', '')
+
+                    if idx < 3:  # Log first 3 messages for debugging
+                        logger.info(f"📍 Message {idx}: group_username={msg_username}, group_title={msg_title}")
+
+                    # Only use group_title if the group_username matches the index
+                    if msg_username.lower() == group_username.lower():
+                        group_title = msg_title
+                        if group_title:
+                            logger.info(f"✅ Found group_title in messages: {group_title} for username: {group_username}")
+                            break
+
+                if not group_title:
+                    logger.warning(f"⚠️ No group_title found for username: {group_username}")
+
+            # Log message IDs in context for debugging
+            context_msg_ids = [hit['_source']['id'] for hit in contexto]
+            logger.info(f"📍 Context message IDs: {context_msg_ids}")
+            logger.info(f"📍 Looking for message ID: {msg_id}")
 
             return {
                 "total": len(contexto),
