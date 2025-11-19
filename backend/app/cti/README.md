@@ -5,6 +5,18 @@
 
 ---
 
+## ⚠️ IMPORTANTE: Portas do Projeto
+
+Este projeto usa **portas customizadas**. Ao criar documentação ou exemplos:
+
+- ✅ Backend API: `http://localhost:8001` (NÃO 8000!)
+- ✅ Swagger UI: `http://localhost:8001/docs`
+- ✅ Frontend: `http://localhost:5174` (NÃO 5173!)
+
+**📖 Consulte [`/PORTS_REFERENCE.md`](../../../PORTS_REFERENCE.md) para detalhes completos.**
+
+---
+
 ## 📁 Estrutura Modular
 
 Este módulo é **completamente isolado** do restante da aplicação. Pode ser desenvolvido, testado e mantido independentemente.

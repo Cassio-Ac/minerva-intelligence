@@ -12,6 +12,22 @@
 
 ---
 
+## ⚠️ IMPORTANTE: Configuração de Portas
+
+Este projeto usa portas customizadas para evitar conflitos com Dashboard AI v2:
+
+| Serviço | Porta | URL |
+|---------|-------|-----|
+| 🌐 **Frontend** | **5174** | `http://localhost:5174` |
+| 🔌 **Backend API** | **8001** | `http://localhost:8001` |
+| 📚 **API Docs** | **8001** | `http://localhost:8001/docs` |
+| 🗄️ **PostgreSQL** | **5433** | `localhost:5433` |
+| 🔴 **Redis** | **6380** | `localhost:6380` |
+
+**📖 Consulte [`PORTS_REFERENCE.md`](./PORTS_REFERENCE.md) para detalhes completos sobre portas e troubleshooting.**
+
+---
+
 ## 📋 Índice
 
 - [Sobre o Projeto](#-sobre-o-projeto)
