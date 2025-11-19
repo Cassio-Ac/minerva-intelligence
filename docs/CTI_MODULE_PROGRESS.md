@@ -199,7 +199,7 @@ app.include_router(cti_actors.router, prefix="/api/v1/cti", tags=["CTI"])
 
 ### 1. Swagger UI
 
-Acesse: `http://localhost:8000/docs`
+Acesse: `http://localhost:8001/docs`
 
 Procure pela seção **"CTI"** na lista de tags.
 
@@ -208,24 +208,24 @@ Procure pela seção **"CTI"** na lista de tags.
 **Listar atores**:
 ```bash
 # Login primeiro para obter token
-TOKEN=$(curl -s -X POST "http://localhost:8000/api/v1/auth/login" \
+TOKEN=$(curl -s -X POST "http://localhost:8001/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}' | jq -r '.access_token')
 
 # Listar atores
-curl -s "http://localhost:8000/api/v1/cti/actors?page=1&page_size=10" \
+curl -s "http://localhost:8001/api/v1/cti/actors?page=1&page_size=10" \
   -H "Authorization: Bearer $TOKEN" | jq .
 
 # Buscar actor
-curl -s "http://localhost:8000/api/v1/cti/actors?search=Sandworm" \
+curl -s "http://localhost:8001/api/v1/cti/actors?search=Sandworm" \
   -H "Authorization: Bearer $TOKEN" | jq .
 
 # Detalhes de um actor
-curl -s "http://localhost:8000/api/v1/cti/actors/Sandworm" \
+curl -s "http://localhost:8001/api/v1/cti/actors/Sandworm" \
   -H "Authorization: Bearer $TOKEN" | jq .
 
 # Famílias do actor
-curl -s "http://localhost:8000/api/v1/cti/actors/Sandworm/families" \
+curl -s "http://localhost:8001/api/v1/cti/actors/Sandworm/families" \
   -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
@@ -407,7 +407,7 @@ pip install mitreattack-python stix2
 O módulo CTI está com a base sólida criada. Quando o backend estiver rodando, você já pode testar os endpoints de actors:
 
 ```
-http://localhost:8000/docs#/CTI
+http://localhost:8001/docs#/CTI
 ```
 
 **Próximo passo recomendado**: Criar Families API endpoint.

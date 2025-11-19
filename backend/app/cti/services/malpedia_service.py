@@ -9,8 +9,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from elasticsearch import AsyncElasticsearch
 
-from app.db.elasticsearch import get_elasticsearch_client
-from app.services.es_server_service_sql import get_server_by_id
+from app.services.es_client_factory import ESClientFactory
 
 logger = logging.getLogger(__name__)
 
@@ -37,13 +36,8 @@ class MalpediaService:
     async def _get_es_client(self) -> AsyncElasticsearch:
         """Get Elasticsearch client"""
         if self._es_client is None:
-            if self.server_id:
-                server = await get_server_by_id(self.server_id)
-                if not server:
-                    raise ValueError(f"ES server not found: {self.server_id}")
-                self._es_client = await get_elasticsearch_client(server_id=self.server_id)
-            else:
-                self._es_client = await get_elasticsearch_client()
+            factory = ESClientFactory()
+            self._es_client = await factory.get_client(server_id=self.server_id)
         return self._es_client
 
     # ==================== ACTORS ====================
