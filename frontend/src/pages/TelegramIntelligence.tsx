@@ -26,7 +26,8 @@ interface TelegramMessage {
     group_username?: string;
     group_title?: string;
   };
-  _actualGroupUsername?: string;  // Added to track the actual group where message is stored
+  _actualGroupUsername?: string;  // Set by frontend when viewing group messages
+  _actual_group_username?: string;  // Set by backend when searching (comes from ES _index)
 }
 
 interface TelegramGroup {
@@ -176,9 +177,11 @@ const TelegramIntelligence: React.FC = () => {
   // Handle message click to show context
   const handleMessageClick = async (message: TelegramMessage) => {
     console.log('Message clicked:', message);
-    // Use _actualGroupUsername first (set when viewing group messages)
-    // This handles cases where messages are forwarded from other groups
-    const groupUsername = message._actualGroupUsername || message.group_info?.group_username || 'unknown';
+    // Priority order:
+    // 1. _actual_group_username (from backend search, comes from ES _index) - most reliable
+    // 2. _actualGroupUsername (from frontend when viewing group) - also reliable
+    // 3. group_info.group_username (from message metadata) - may be wrong for forwarded messages
+    const groupUsername = message._actual_group_username || message._actualGroupUsername || message.group_info?.group_username || 'unknown';
     console.log('Using group username:', groupUsername);
     // Normalize index name: add prefix and convert to lowercase
     const indexName = `telegram_messages_${groupUsername.toLowerCase()}`;

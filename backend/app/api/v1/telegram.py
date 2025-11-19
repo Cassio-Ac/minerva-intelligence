@@ -54,9 +54,19 @@ async def search_messages(
             server_id=request.server_id
         )
 
+        # Add _index to each message so frontend knows where it came from
+        messages_with_index = []
+        for hit in result['hits']:
+            msg = hit['_source']
+            # Extract group username from index name (telegram_messages_groupname)
+            index_name = hit['_index']
+            group_username = index_name.replace('telegram_messages_', '')
+            msg['_actual_group_username'] = group_username
+            messages_with_index.append(msg)
+
         return TelegramMessageSearchResponse(
             total=result['total'],
-            messages=[hit['_source'] for hit in result['hits']],
+            messages=messages_with_index,
             search_type=result['search_type']
         )
 
@@ -89,9 +99,19 @@ async def search_by_user(
             server_id=request.server_id
         )
 
+        # Add _index to each message so frontend knows where it came from
+        messages_with_index = []
+        for hit in result['hits']:
+            msg = hit['_source']
+            # Extract group username from index name (telegram_messages_groupname)
+            index_name = hit['_index']
+            group_username = index_name.replace('telegram_messages_', '')
+            msg['_actual_group_username'] = group_username
+            messages_with_index.append(msg)
+
         return TelegramUserSearchResponse(
             total=result['total'],
-            messages=[hit['_source'] for hit in result['hits']],
+            messages=messages_with_index,
             search_term=result['search_term']
         )
 
