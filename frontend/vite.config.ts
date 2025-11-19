@@ -19,8 +19,8 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',  // Aceita conexões externas
-    port: 5174,
-    strictPort: true,
+    port: 5180,       // Porta padrão para modo dev (diferente do Docker 5174)
+    strictPort: false, // Permite usar outra porta se 5180 estiver ocupada
     proxy: {
       '/api': {
         target: 'http://localhost:8001',
