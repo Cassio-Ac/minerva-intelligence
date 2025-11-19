@@ -28,6 +28,7 @@ from app.api.v1 import rss  # RSS feeds
 from app.api.v1 import breaches  # Data Breaches & Leaks
 from app.api.v1 import cves  # CVE Detection
 from app.api.v1 import telegram  # Telegram Intelligence
+from app.cti.api import actors as cti_actors  # CTI Module (isolated)
 from app.websocket import sio
 from app.middleware.metrics_middleware import MetricsMiddleware
 
@@ -96,6 +97,9 @@ app.include_router(rss.router, prefix="/api/v1", tags=["rss"])
 app.include_router(breaches.router, prefix="/api/v1", tags=["breaches"])
 app.include_router(cves.router, prefix="/api/v1", tags=["cves"])
 app.include_router(telegram.router, prefix="/api/v1", tags=["telegram"])
+
+# CTI Module (Cyber Threat Intelligence) - Modular & Isolated
+app.include_router(cti_actors.router, prefix="/api/v1/cti", tags=["CTI"])
 
 # Mount static files (profile photos, downloads, etc)
 app.mount("/static", StaticFiles(directory="static"), name="static")
