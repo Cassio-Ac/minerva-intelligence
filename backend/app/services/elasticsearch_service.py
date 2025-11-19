@@ -311,6 +311,101 @@ class ElasticsearchService:
 
         return fields
 
+    async def list_indices(
+        self, pattern: str = "*", server_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Lista índices Elasticsearch que correspondem ao padrão
+
+        Args:
+            pattern: Padrão de índices (ex: 'log-*', default: '*')
+            server_id: ID do servidor ES (opcional)
+
+        Returns:
+            Lista de dicionários com informações dos índices
+        """
+        try:
+            factory = ESClientFactory()
+            es = await factory.get_client(server_id)
+
+            # Obter informações dos índices via cat API
+            # Formato: index,docs.count,store.size
+            indices_response = await es.cat.indices(
+                index=pattern,
+                format="json",
+                h="index,docs.count,store.size",
+                s="index:asc"
+            )
+
+            # Filtrar índices do sistema (começam com .)
+            indices = [
+                {
+                    "name": idx["index"],
+                    "docs_count": int(idx.get("docs.count", 0) or 0),
+                    "size": idx.get("store.size", "0b")
+                }
+                for idx in indices_response
+                if not idx["index"].startswith(".")
+            ]
+
+            logger.info(f"✅ Found {len(indices)} indices matching pattern '{pattern}'")
+            return indices
+
+        except Exception as e:
+            logger.error(f"❌ Error listing indices with pattern '{pattern}': {e}")
+            raise
+
+    async def get_index_mapping(
+        self, index: str, server_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Obtém o mapping completo de um índice
+
+        Args:
+            index: Nome do índice
+            server_id: ID do servidor ES (opcional)
+
+        Returns:
+            Mapping do índice
+        """
+        try:
+            factory = ESClientFactory()
+            es = await factory.get_client(server_id)
+
+            mapping = await es.indices.get_mapping(index=index)
+
+            logger.info(f"✅ Got mapping for index {index}")
+            return mapping
+
+        except Exception as e:
+            logger.error(f"❌ Error getting mapping for index {index}: {e}")
+            raise
+
+    async def cluster_health(
+        self, server_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Obtém informações de saúde do cluster Elasticsearch
+
+        Args:
+            server_id: ID do servidor ES (opcional)
+
+        Returns:
+            Informações de saúde do cluster
+        """
+        try:
+            factory = ESClientFactory()
+            es = await factory.get_client(server_id)
+
+            health = await es.cluster.health()
+
+            logger.info(f"✅ Cluster health: {health['status']}")
+            return health
+
+        except Exception as e:
+            logger.error(f"❌ Error getting cluster health: {e}")
+            raise
+
     async def test_connection(
         self, index: str, server_id: Optional[str] = None
     ) -> bool:

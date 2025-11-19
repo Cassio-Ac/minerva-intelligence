@@ -20,8 +20,8 @@ def upgrade():
     # Create index_contexts table
     op.create_table(
         'index_contexts',
-        sa.Column('id', sa.String(), nullable=False),
-        sa.Column('es_server_id', sa.String(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False, primary_key=True, server_default=sa.text('gen_random_uuid()')),
+        sa.Column('es_server_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('index_pattern', sa.String(), nullable=False),
         sa.Column('description', sa.Text(), nullable=True),
         sa.Column('field_descriptions', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
@@ -40,7 +40,7 @@ def upgrade():
     # Create knowledge_documents table
     op.create_table(
         'knowledge_documents',
-        sa.Column('id', sa.String(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False, primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('title', sa.String(), nullable=False),
         sa.Column('content', sa.Text(), nullable=False),
         sa.Column('category', sa.String(), nullable=True),

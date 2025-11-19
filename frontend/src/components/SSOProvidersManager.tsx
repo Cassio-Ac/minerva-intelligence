@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSettingsStore } from '@stores/settingsStore';
 import { useAuthStore } from '@stores/authStore';
+import { API_URL, API_BASE_URL } from '../config/api';
 
 interface SSOProvider {
   id: string;
@@ -38,7 +39,7 @@ interface SSOProviderFormData {
   is_active: boolean;
 }
 
-const API_BASE = 'http://localhost:8000/api/v1';
+const API_BASE = `${API_URL}`;
 
 export const SSOProvidersManager: React.FC = () => {
   const { currentColors } = useSettingsStore();
@@ -55,7 +56,7 @@ export const SSOProvidersManager: React.FC = () => {
     client_secret: '',
     tenant_id: '',
     authority_url: '',
-    redirect_uri: 'http://localhost:8000/api/v1/auth/sso/callback/entra_id',
+    redirect_uri: `${API_URL}/auth/sso/callback/entra_id`,
     scopes: ['openid', 'profile', 'email', 'User.Read'],
     default_role: 'reader',
     auto_provision: true,
@@ -249,7 +250,7 @@ export const SSOProvidersManager: React.FC = () => {
       client_secret: '',
       tenant_id: '',
       authority_url: '',
-      redirect_uri: 'http://localhost:8000/api/v1/auth/sso/callback/entra_id',
+      redirect_uri: `${API_URL}/auth/sso/callback/entra_id`,
       scopes: ['openid', 'profile', 'email', 'User.Read'],
       default_role: 'reader',
       auto_provision: true,
@@ -477,7 +478,7 @@ export const SSOProvidersManager: React.FC = () => {
                   type="url"
                   value={formData.redirect_uri}
                   onChange={(e) => setFormData({ ...formData, redirect_uri: e.target.value })}
-                  placeholder="http://localhost:8000/api/v1/auth/sso/callback/entra_id"
+                  placeholder={`${API_URL}/auth/sso/callback/entra_id`}
                   required
                   style={{
                     width: '100%',

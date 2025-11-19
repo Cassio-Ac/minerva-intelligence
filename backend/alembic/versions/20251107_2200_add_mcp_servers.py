@@ -20,7 +20,7 @@ def upgrade():
     """Create mcp_servers table"""
     op.create_table(
         'mcp_servers',
-        sa.Column('id', sa.String(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False, server_default=sa.text('gen_random_uuid()')),
         sa.Column('name', sa.String(), nullable=False),
         sa.Column('type', sa.String(), nullable=False),  # 'stdio', 'http', or 'sse'
         sa.Column('command', sa.String(), nullable=True),

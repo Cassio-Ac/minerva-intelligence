@@ -46,10 +46,8 @@ def upgrade() -> None:
         unique=True
     )
 
-    # Create indexes for efficient queries
-    op.create_index('ix_index_mcp_config_es_server_id', 'index_mcp_config', ['es_server_id'])
-    op.create_index('ix_index_mcp_config_index_name', 'index_mcp_config', ['index_name'])
-    op.create_index('ix_index_mcp_config_mcp_server_id', 'index_mcp_config', ['mcp_server_id'])
+    # Single-column indexes already created via index=True in column definitions
+    # Only need the priority index since that column doesn't have index=True
     op.create_index('ix_index_mcp_config_priority', 'index_mcp_config', ['priority'])
 
 

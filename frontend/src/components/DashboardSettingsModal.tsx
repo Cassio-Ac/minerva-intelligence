@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '@stores/authStore';
 import { useSettingsStore } from '@stores/settingsStore';
 import { api } from '../services/api';
+import { API_URL, API_BASE_URL } from '../config/api';
 
 interface DashboardSettingsModalProps {
   dashboardId: string;
@@ -45,7 +46,7 @@ export const DashboardSettingsModal: React.FC<DashboardSettingsModalProps> = ({
     const loadPermissions = async () => {
       try {
         const response = await fetch(
-          `http://localhost:8000/api/v1/dashboard-permissions/${dashboardId}`,
+          `${API_URL}/dashboard-permissions/${dashboardId}`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem('dashboard-auth-storage')

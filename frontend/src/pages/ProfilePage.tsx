@@ -7,8 +7,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@stores/authStore';
 import { useSettingsStore, type Theme } from '@stores/settingsStore';
+import { API_URL, API_BASE_URL } from '../config/api';
 
-const API_BASE = 'http://localhost:8000/api/v1';
+const API_BASE = `${API_URL}`;
 
 export const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
@@ -235,7 +236,7 @@ export const ProfilePage: React.FC = () => {
             {/* Avatar */}
             {user.profile_photo_url ? (
               <img
-                src={`http://localhost:8000${user.profile_photo_url}`}
+                src={`${API_BASE_URL}${user.profile_photo_url}`}
                 alt={user.username}
                 className="w-16 h-16 rounded-full"
                 style={{ objectFit: 'cover' }}

@@ -1,0 +1,4 @@
+backend:51285
+celery-worker:51286
+celery-beat:51287
+frontend:51288

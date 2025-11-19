@@ -51,4 +51,26 @@ export const getThemeStyles = (currentColors: ThemeColors) => ({
     borderStyle: 'solid' as const,
     borderColor: currentColors.border.default,
   },
+
+  /**
+   * Input field styles
+   */
+  input: {
+    backgroundColor: currentColors.bg.secondary,
+    color: currentColors.text.primary,
+  },
+
+  /**
+   * Border styles
+   */
+  border: {
+    borderColor: currentColors.border.default,
+  },
+
+  /**
+   * Text styles
+   */
+  text: {
+    color: currentColors.text.primary,
+  },
 });

@@ -16,6 +16,7 @@ import { DashboardSettingsModal } from '@components/DashboardSettingsModal';
 import { useDashboardStore } from '@stores/dashboardStore';
 import { useSettingsStore } from '@stores/settingsStore';
 import type { Widget } from '@types/widget';
+import { API_URL, API_BASE_URL } from '../config/api';
 
 export const DashboardEditor: React.FC = () => {
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ export const DashboardEditor: React.FC = () => {
           }
 
           // Sem ID na URL: tentar carregar dashboard example
-          const response = await fetch('http://localhost:8000/api/v1/dashboards/example-dashboard');
+          const response = await fetch(`${API_URL}/dashboards/example-dashboard`);
 
           if (response.ok) {
             const dashboard = await response.json();
@@ -80,7 +81,7 @@ export const DashboardEditor: React.FC = () => {
               widgets: [],
             };
 
-            const createResponse = await fetch('http://localhost:8000/api/v1/dashboards', {
+            const createResponse = await fetch(`${API_URL}/dashboards`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(newDashboard),
@@ -179,7 +180,7 @@ export const DashboardEditor: React.FC = () => {
     };
 
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/dashboards/${currentDashboard.id}`, {
+      const response = await fetch(`${API_URL}/dashboards/${currentDashboard.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -214,7 +215,7 @@ export const DashboardEditor: React.FC = () => {
         widgets: widgets,
       };
 
-      const response = await fetch(`http://localhost:8000/api/v1/dashboards/${currentDashboard.id}`, {
+      const response = await fetch(`${API_URL}/dashboards/${currentDashboard.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -262,7 +263,7 @@ export const DashboardEditor: React.FC = () => {
         token = state?.token || '';
       }
 
-      const response = await fetch(`http://localhost:8000/api/v1/export/dashboards/${currentDashboard.id}/export/pdf`, {
+      const response = await fetch(`${API_URL}/export/dashboards/${currentDashboard.id}/export/pdf`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -275,7 +276,7 @@ export const DashboardEditor: React.FC = () => {
         console.log('✅ PDF exportado com sucesso:', result);
 
         // Fazer download do arquivo
-        const downloadResponse = await fetch(`http://localhost:8000/api/v1/downloads/${result.download_id}/download`, {
+        const downloadResponse = await fetch(`${API_URL}/downloads/${result.download_id}/download`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -320,7 +321,7 @@ export const DashboardEditor: React.FC = () => {
     try {
       // 1. Atualizar dashboard (título e descrição)
       const dashboardResponse = await fetch(
-        `http://localhost:8000/api/v1/dashboards/${currentDashboard.id}`,
+        `${API_URL}/dashboards/${currentDashboard.id}`,
         {
           method: 'PATCH',
           headers: {
@@ -352,7 +353,7 @@ export const DashboardEditor: React.FC = () => {
 
       // Tentar criar permissão (se já existe, atualizar)
       const permissionResponse = await fetch(
-        `http://localhost:8000/api/v1/dashboard-permissions/`,
+        `${API_URL}/dashboard-permissions/`,
         {
           method: 'POST',
           headers: {
@@ -369,7 +370,7 @@ export const DashboardEditor: React.FC = () => {
 
       // Se criação falhar (409 = já existe), fazer update
       if (permissionResponse.status === 409 || permissionResponse.status === 400) {
-        await fetch(`http://localhost:8000/api/v1/dashboard-permissions/${currentDashboard.id}`, {
+        await fetch(`${API_URL}/dashboard-permissions/${currentDashboard.id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',

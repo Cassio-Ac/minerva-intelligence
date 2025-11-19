@@ -24,6 +24,10 @@ from app.api.v1 import metrics  # System metrics
 from app.api.v1 import export  # Export (PDF/PNG)
 from app.api.v1 import admin  # Admin endpoints
 from app.api.v1 import csv_upload, index_access  # CSV upload and index access management
+from app.api.v1 import rss  # RSS feeds
+from app.api.v1 import breaches  # Data Breaches & Leaks
+from app.api.v1 import cves  # CVE Detection
+from app.api.v1 import telegram  # Telegram Intelligence
 from app.websocket import sio
 from app.middleware.metrics_middleware import MetricsMiddleware
 
@@ -88,6 +92,10 @@ app.include_router(export.router, prefix="/api/v1/export", tags=["export"])
 app.include_router(admin.router, prefix="/api/v1", tags=["admin"])
 app.include_router(csv_upload.router, prefix="/api/v1", tags=["csv-upload"])
 app.include_router(index_access.router, prefix="/api/v1", tags=["index-access"])
+app.include_router(rss.router, prefix="/api/v1", tags=["rss"])
+app.include_router(breaches.router, prefix="/api/v1", tags=["breaches"])
+app.include_router(cves.router, prefix="/api/v1", tags=["cves"])
+app.include_router(telegram.router, prefix="/api/v1", tags=["telegram"])
 
 # Mount static files (profile photos, downloads, etc)
 app.mount("/static", StaticFiles(directory="static"), name="static")

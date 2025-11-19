@@ -82,6 +82,14 @@ export const ChatPanel: React.FC = () => {
         context: messages.slice(-5), // Últimas 5 mensagens como contexto
       });
 
+      // DEBUG: Log response to see what we're getting
+      console.log('🐛 Chat API Response:', {
+        fullResponse: response,
+        explanationType: typeof response.explanation,
+        explanationValue: response.explanation,
+        explanationPreview: response.explanation?.substring(0, 100)
+      });
+
       // Adicionar resposta do assistente
       const assistantMessage: Message = {
         role: 'assistant',

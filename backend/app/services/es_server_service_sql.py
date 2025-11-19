@@ -36,6 +36,8 @@ class ESServerServiceSQL:
                 url=server_data.connection.url,
                 username=server_data.connection.username,
                 password=server_data.connection.password,  # Auto-criptografa via property
+                use_ssl=server_data.connection.url.startswith('https://'),
+                verify_certs=server_data.connection.verify_ssl,
                 is_default=server_data.is_default,
                 is_active=True,
             )
@@ -191,18 +193,100 @@ class ESServerServiceSQL:
     async def _unset_all_defaults(self, db: AsyncSession):
         """Remove flag is_default de todos os servidores"""
         try:
-            stmt = update(ESServerDB).values(is_default=False)
+            stmt = update(ESServerDB).values(is_default=False).where(ESServerDB.is_default == True)
             await db.execute(stmt)
             await db.flush()
         except Exception as e:
             logger.error(f"❌ Error unsetting defaults: {e}")
+
+    async def get_indices(self, db: AsyncSession, server_id: str) -> List:
+        """
+        Lista índices do servidor Elasticsearch
+
+        Args:
+            db: Sessão do banco
+            server_id: ID do servidor
+
+        Returns:
+            Lista de índices
+        """
+        from app.models.elasticsearch_server import ESIndexInfo
+        from elasticsearch import AsyncElasticsearch
+
+        # Buscar servidor no SQL
+        server = await self.get(db, server_id)
+        if not server:
+            logger.warning(f"Server {server_id} not found in SQL")
+            return []
+
+        try:
+            # Criar cliente ES para este servidor
+            es_client = AsyncElasticsearch(
+                hosts=[server.connection.url],
+                basic_auth=(
+                    (server.connection.username, server.connection.password)
+                    if server.connection.username
+                    else None
+                ),
+                verify_certs=server.connection.verify_ssl,
+                request_timeout=server.connection.timeout,
+            )
+
+            # Buscar índices via cat API
+            cat_indices = await es_client.cat.indices(format="json")
+
+            await es_client.close()
+
+            # Processar resultados
+            indices = []
+            for idx in cat_indices:
+                name = idx.get("index", "")
+                # Ignorar índices do sistema
+                if name.startswith("."):
+                    continue
+
+                # Converter store.size (vem como string tipo "249b", "1.2kb", etc)
+                store_size_str = idx.get("store.size", "0")
+                try:
+                    # Remover sufixos (b, kb, mb, gb) e converter
+                    import re
+                    size_match = re.match(r'([\d.]+)([a-z]+)?', str(store_size_str))
+                    if size_match:
+                        number = float(size_match.group(1))
+                        unit = size_match.group(2) or 'b'
+                        # Converter para bytes
+                        multipliers = {'b': 1, 'kb': 1024, 'mb': 1024**2, 'gb': 1024**3}
+                        size_in_bytes = int(number * multipliers.get(unit.lower(), 1))
+                    else:
+                        size_in_bytes = 0
+                except:
+                    size_in_bytes = 0
+
+                indices.append(
+                    ESIndexInfo(
+                        name=name,
+                        doc_count=int(idx.get("docs.count", 0) or 0),
+                        size_in_bytes=size_in_bytes,
+                        health=idx.get("health"),
+                        status=idx.get("status"),
+                        primary_shards=int(idx.get("pri", 0) or 0),
+                        replica_shards=int(idx.get("rep", 0) or 0),
+                    )
+                )
+
+            logger.info(f"📚 Listed {len(indices)} indices from server {server.name}")
+            return sorted(indices, key=lambda x: x.name)
+
+        except Exception as e:
+            logger.error(f"Error listing indices from server {server_id}: {e}")
+            return []
 
     def _to_pydantic(self, db_server: ESServerDB) -> ElasticsearchServer:
         """Converte SQLAlchemy model para Pydantic model"""
         from app.models.elasticsearch_server import ESServerConnection, ESServerMetadata, ESServerStats
 
         return ElasticsearchServer(
-            id=db_server.id,
+            id=str(db_server.id),
             name=db_server.name,
             description=db_server.description,
             connection=ESServerConnection(
@@ -210,6 +294,7 @@ class ESServerServiceSQL:
                 username=db_server.username,
                 password=db_server.password,  # Auto-descriptografa via property
                 verify_ssl=db_server.verify_certs,
+                timeout=30,  # Default timeout
             ),
             metadata=ESServerMetadata(
                 created_at=db_server.created_at,

@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSettingsStore } from '@stores/settingsStore';
 import { useAuthStore } from '@stores/authStore';
+import { API_URL } from '../config/api';
 
 interface SystemMetrics {
   total_users: number;
@@ -28,7 +29,7 @@ export const AdminHome: React.FC = () => {
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/v1/admin/metrics', {
+        const response = await fetch(`${API_URL}/admin/metrics`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useSettingsStore } from '@stores/settingsStore';
 import { useAuthStore } from '@stores/authStore';
 import { IndexAccessManager } from './IndexAccessManager';
+import { API_URL } from '../config/api';
 
 interface User {
   id: string;
@@ -39,7 +40,7 @@ interface ESServer {
   url: string;
 }
 
-const API_BASE = 'http://localhost:8000/api/v1';
+const API_BASE = `${API_URL}`;
 
 export const UserManager: React.FC = () => {
   const { currentColors } = useSettingsStore();

@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSettingsStore } from '@stores/settingsStore';
+import { API_URL, API_BASE_URL } from '../config/api';
 
 interface MCPServer {
   id: string;
@@ -46,7 +47,7 @@ export const MCPManager: React.FC = () => {
   const loadServers = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('http://localhost:8000/api/v1/mcp-servers');
+      const response = await fetch(`${API_URL}/mcp-servers`);
 
       if (response.ok) {
         const data = await response.json();
@@ -81,7 +82,7 @@ export const MCPManager: React.FC = () => {
         payload.url = formData.url;
       }
 
-      const response = await fetch('http://localhost:8000/api/v1/mcp-servers', {
+      const response = await fetch(`${API_URL}/mcp-servers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -103,7 +104,7 @@ export const MCPManager: React.FC = () => {
 
   const handleToggleActive = async (serverId: string, isActive: boolean) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/mcp-servers/${serverId}`, {
+      const response = await fetch(`${API_URL}/mcp-servers/${serverId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !isActive }),
@@ -126,7 +127,7 @@ export const MCPManager: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/mcp-servers/${serverId}`, {
+      const response = await fetch(`${API_URL}/mcp-servers/${serverId}`, {
         method: 'DELETE',
       });
 

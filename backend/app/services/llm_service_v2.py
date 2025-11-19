@@ -577,6 +577,9 @@ class LLMServiceV2:
             query = result.get("query", {})
             explanation = result.get("explanation", "Visualização criada")
 
+            # DEBUG: Log what we're about to return
+            logger.info(f"🐛 DEBUG - Visualization response - explanation type: {type(explanation)}, value: {explanation[:200] if explanation else 'None'}")
+
             # FIX: Databricks às vezes retorna ASCII art ou URLs em vez de deixar o frontend renderizar
             # Detectar e limpar ASCII art, URLs QuickChart, etc.
             if any(pattern in explanation for pattern in ['quickchart.io', 'https://', '///', '+-', '|', '\\', 'ASCII']):
@@ -640,8 +643,13 @@ class LLMServiceV2:
             }
         else:
             # Conversational response
+            explanation_text = result.get("explanation", "")
+
+            # DEBUG: Log what we're about to return
+            logger.info(f"🐛 DEBUG - Conversational response - explanation type: {type(explanation_text)}, value: {explanation_text[:200] if explanation_text else 'None'}")
+
             return {
-                "explanation": result.get("explanation", ""),
+                "explanation": explanation_text,
                 "visualization_type": None,
                 "query": None,
                 "needs_clarification": False,

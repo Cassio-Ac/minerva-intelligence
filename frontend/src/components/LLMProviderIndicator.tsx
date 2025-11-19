@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSettingsStore } from '@stores/settingsStore';
 import { useLLMProvider } from '@hooks/useLLMProvider';
 import axios from 'axios';
+import { API_URL } from '../config/api';
 
 interface LLMProviderIndicatorProps {
   compact?: boolean; // Modo compacto para header
@@ -54,7 +55,7 @@ export const LLMProviderIndicator: React.FC<LLMProviderIndicatorProps> = ({ comp
 
     setLoadingProviders(true);
     try {
-      const response = await axios.get('/api/v1/llm-providers');
+      const response = await axios.get(`${API_URL}/llm-providers`);
       setAllProviders(response.data);
       setIsOpen(true);
     } catch (error) {
@@ -67,7 +68,7 @@ export const LLMProviderIndicator: React.FC<LLMProviderIndicatorProps> = ({ comp
   // Definir provedor como padrão
   const handleSetDefault = async (providerId: string) => {
     try {
-      await axios.post(`/api/v1/llm-providers/${providerId}/set-default`);
+      await axios.post(`${API_URL}/llm-providers/${providerId}/set-default`);
       await refresh(); // Recarregar provider atual
       setIsOpen(false);
 

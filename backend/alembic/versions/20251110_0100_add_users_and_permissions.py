@@ -19,23 +19,6 @@ depends_on = None
 def upgrade() -> None:
     """Upgrade database schema"""
 
-    # Create enum types
-    op.execute("""
-        DO $$ BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'userrole') THEN
-                CREATE TYPE userrole AS ENUM ('admin', 'power', 'reader');
-            END IF;
-        END $$;
-    """)
-
-    op.execute("""
-        DO $$ BEGIN
-            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'dashboardvisibility') THEN
-                CREATE TYPE dashboardvisibility AS ENUM ('private', 'public', 'shared');
-            END IF;
-        END $$;
-    """)
-
     # Create users table
     op.create_table(
         'users',
@@ -44,7 +27,7 @@ def upgrade() -> None:
         sa.Column('email', sa.String(255), nullable=False, unique=True, index=True),
         sa.Column('hashed_password', sa.String(255), nullable=False),
         sa.Column('full_name', sa.String(255), nullable=True),
-        sa.Column('role', sa.Enum('admin', 'power', 'reader', name='userrole'), nullable=False, server_default='reader'),
+        sa.Column('role', postgresql.ENUM('admin', 'power', 'reader', name='userrole', create_type=True), nullable=False, server_default='reader'),
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
         sa.Column('is_superuser', sa.Boolean(), nullable=False, server_default='false'),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('NOW()')),
@@ -59,7 +42,7 @@ def upgrade() -> None:
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column('dashboard_id', sa.String(255), nullable=False, unique=True, index=True),
         sa.Column('owner_id', postgresql.UUID(as_uuid=True), nullable=False, index=True),
-        sa.Column('visibility', sa.Enum('private', 'public', 'shared', name='dashboardvisibility'), nullable=False, server_default='private'),
+        sa.Column('visibility', postgresql.ENUM('private', 'public', 'shared', name='dashboardvisibility', create_type=True), nullable=False, server_default='private'),
         sa.Column('allow_edit_by_others', sa.Boolean(), nullable=False, server_default='false'),
         sa.Column('allow_copy', sa.Boolean(), nullable=False, server_default='true'),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('NOW()')),
@@ -79,10 +62,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     )
 
-    # Create indexes
-    op.create_index('ix_dashboard_permissions_owner_id', 'dashboard_permissions', ['owner_id'])
-    op.create_index('ix_dashboard_shares_permission_id', 'dashboard_shares', ['permission_id'])
-    op.create_index('ix_dashboard_shares_user_id', 'dashboard_shares', ['user_id'])
+    # Indexes already created automatically via index=True in column definitions above
 
     # ==================== GROUPS TABLES ====================
 

@@ -171,6 +171,13 @@ class RSSArticle(BaseModel):
     entities: Optional[List[str]] = None  # Extracted entities
     keywords: Optional[List[str]] = None
 
+    # Malpedia enrichment (LLM-generated)
+    enriched_summary: Optional[str] = None
+    actors_mentioned: Optional[List[str]] = None
+    families_mentioned: Optional[List[str]] = None
+    enriched_at: Optional[str] = None
+    enrichment_version: Optional[str] = None
+
     class Config:
         populate_by_name = True
 

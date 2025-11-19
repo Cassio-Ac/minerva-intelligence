@@ -53,10 +53,7 @@ def upgrade() -> None:
         unique=True
     )
 
-    # 5. Criar índices para melhor performance
-    op.create_index('ix_user_index_accesses_user_id', 'user_index_accesses', ['user_id'])
-    op.create_index('ix_user_index_accesses_es_server_id', 'user_index_accesses', ['es_server_id'])
-    op.create_index('ix_user_index_accesses_index_name', 'user_index_accesses', ['index_name'])
+    # Single-column indexes already created via index=True in column definitions above
 
 
 def downgrade() -> None:

@@ -7,6 +7,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { API_URL, API_BASE_URL } from '../config/api';
 
 export const Header: React.FC = () => {
   const location = useLocation();
@@ -41,8 +42,11 @@ export const Header: React.FC = () => {
     { path: '/', label: 'Home', icon: '🏠' },
     { path: '/dashboards', label: 'Dashboards', icon: '📊' },
     { path: '/chat', label: 'Chat', icon: '💬', requiresLLM: true },
+    { path: '/info', label: 'Info', icon: '📰' },
+    { path: '/leaks', label: 'Data Leaks', icon: '⚠️' },
+    { path: '/cves', label: 'CVEs', icon: '🛡️' },
+    { path: '/telegram', label: 'Telegram', icon: '✈️' },
     { path: '/downloads', label: 'Downloads', icon: '⬇️' },
-    { path: '/servers', label: 'Servidores', icon: '🖥️', requiresAdmin: true },
     { path: '/settings', label: 'Configurações', icon: '⚙️', requiresAdmin: true },
   ];
 
@@ -101,6 +105,9 @@ export const Header: React.FC = () => {
         <Link
           to="/"
           style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
             fontSize: '20px',
             fontWeight: '700',
             color: currentColors.text.primary,
@@ -109,7 +116,16 @@ export const Header: React.FC = () => {
             flexShrink: 0,
           }}
         >
-          Dashboard AI
+          <img
+            src="/assets/minerva-owl.png"
+            alt="Minerva"
+            style={{
+              width: '32px',
+              height: '32px',
+              objectFit: 'contain',
+            }}
+          />
+          Minerva
         </Link>
 
         {/* Navigation Links */}
@@ -182,7 +198,7 @@ export const Header: React.FC = () => {
           >
             {user.profile_photo_url ? (
               <img
-                src={`http://localhost:8000${user.profile_photo_url}`}
+                src={`${API_BASE_URL}${user.profile_photo_url}`}
                 alt={user.username}
                 style={{
                   width: '32px',

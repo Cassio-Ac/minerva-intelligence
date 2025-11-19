@@ -36,7 +36,7 @@ class User(Base):
     full_name = Column(String(255))
 
     # Authorization
-    role = Column(SQLEnum(UserRole), nullable=False, default=UserRole.READER)
+    role = Column(String(50), nullable=False, default="reader")
     is_active = Column(Boolean, default=True, nullable=False)
     is_superuser = Column(Boolean, default=False, nullable=False)
 

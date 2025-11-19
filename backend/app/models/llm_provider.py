@@ -4,7 +4,7 @@ Database model for LLM provider configurations
 """
 
 from sqlalchemy import Column, String, Float, Integer, Boolean, DateTime
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
 from app.db.database import Base
 import uuid
@@ -15,7 +15,7 @@ class LLMProvider(Base):
 
     __tablename__ = "llm_providers"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)  # User-friendly name
     provider_type = Column(String, nullable=False)  # 'anthropic', 'openai', 'databricks', etc
     model_name = Column(String, nullable=False)  # e.g., 'claude-3-5-sonnet-20241022'

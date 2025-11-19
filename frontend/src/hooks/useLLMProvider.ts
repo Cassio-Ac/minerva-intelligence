@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_URL } from '../config/api';
 
 interface LLMProvider {
   id: string;
@@ -23,7 +24,7 @@ export const useLLMProvider = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get('/api/v1/llm-providers');
+      const response = await axios.get(`${API_URL}/llm-providers`);
       const providers = response.data as LLMProvider[];
 
       // Buscar o provedor padrão

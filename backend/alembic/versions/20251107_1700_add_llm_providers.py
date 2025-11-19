@@ -20,7 +20,7 @@ def upgrade() -> None:
     # Create llm_providers table
     op.create_table(
         'llm_providers',
-        sa.Column('id', sa.String(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False, primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('name', sa.String(), nullable=False),
         sa.Column('provider_type', sa.String(), nullable=False),
         sa.Column('model_name', sa.String(), nullable=False),

@@ -86,7 +86,7 @@ async def create_provider(
     )
 
     return LLMProviderResponse(
-        id=created.id,
+        id=str(created.id),
         name=created.name,
         provider_type=created.provider_type,
         model_name=created.model_name,
@@ -115,7 +115,7 @@ async def list_providers(
 
     return [
         LLMProviderResponse(
-            id=p.id,
+            id=str(p.id),
             name=p.name,
             provider_type=p.provider_type,
             model_name=p.model_name,
@@ -144,7 +144,7 @@ async def get_default_provider(db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="No default provider configured")
 
     return LLMProviderResponse(
-        id=provider.id,
+        id=str(provider.id),
         name=provider.name,
         provider_type=provider.provider_type,
         model_name=provider.model_name,
@@ -297,7 +297,7 @@ async def get_provider(
         raise HTTPException(status_code=404, detail="Provider not found")
 
     return LLMProviderResponse(
-        id=provider.id,
+        id=str(provider.id),
         name=provider.name,
         provider_type=provider.provider_type,
         model_name=provider.model_name,
@@ -340,7 +340,7 @@ async def update_provider(
         raise HTTPException(status_code=404, detail="Provider not found")
 
     return LLMProviderResponse(
-        id=updated.id,
+        id=str(updated.id),
         name=updated.name,
         provider_type=updated.provider_type,
         model_name=updated.model_name,
@@ -370,7 +370,7 @@ async def set_default_provider(
         raise HTTPException(status_code=404, detail="Provider not found")
 
     return LLMProviderResponse(
-        id=updated.id,
+        id=str(updated.id),
         name=updated.name,
         provider_type=updated.provider_type,
         model_name=updated.model_name,

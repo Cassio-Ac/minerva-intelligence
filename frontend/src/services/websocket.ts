@@ -6,7 +6,7 @@
 import { io, Socket } from 'socket.io-client';
 import { Widget, WidgetPosition } from '../types/widget';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 class WebSocketService {
   private socket: Socket | null = null;

@@ -22,7 +22,7 @@ def upgrade() -> None:
     # Create es_servers table
     op.create_table(
         'es_servers',
-        sa.Column('id', sa.String(36), primary_key=True),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('name', sa.String(100), nullable=False),
         sa.Column('url', sa.String(500), nullable=False),
         sa.Column('username', sa.String(100), nullable=True),
@@ -39,11 +39,11 @@ def upgrade() -> None:
     # Create dashboards table
     op.create_table(
         'dashboards',
-        sa.Column('id', sa.String(36), primary_key=True),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('title', sa.String(200), nullable=False),
         sa.Column('description', sa.Text(), nullable=True),
         sa.Column('index', sa.String(255), nullable=False),
-        sa.Column('server_id', sa.String(36), sa.ForeignKey('es_servers.id', ondelete='SET NULL'), nullable=True),
+        sa.Column('server_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('es_servers.id', ondelete='SET NULL'), nullable=True),
         sa.Column('layout', postgresql.JSON(astext_type=sa.Text()), nullable=False, server_default='{}'),
         sa.Column('widgets', postgresql.JSON(astext_type=sa.Text()), nullable=False, server_default='[]'),
         sa.Column('is_public', sa.Boolean(), nullable=False, server_default='false'),
@@ -63,10 +63,10 @@ def upgrade() -> None:
     # Create conversations table
     op.create_table(
         'conversations',
-        sa.Column('id', sa.String(36), primary_key=True),
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('title', sa.String(200), nullable=False),
         sa.Column('index', sa.String(255), nullable=False),
-        sa.Column('server_id', sa.String(36), sa.ForeignKey('es_servers.id', ondelete='SET NULL'), nullable=True),
+        sa.Column('server_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('es_servers.id', ondelete='SET NULL'), nullable=True),
         sa.Column('messages', postgresql.JSON(astext_type=sa.Text()), nullable=False, server_default='[]'),
         sa.Column('created_by', sa.String(100), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
@@ -77,27 +77,11 @@ def upgrade() -> None:
     op.create_index('ix_conversations_created_by', 'conversations', ['created_by'])
     op.create_index('idx_conversations_updated_at', 'conversations', ['updated_at'])
 
-    # Create users table (futuro)
-    op.create_table(
-        'users',
-        sa.Column('id', sa.String(36), primary_key=True),
-        sa.Column('email', sa.String(255), nullable=False),
-        sa.Column('username', sa.String(100), nullable=False),
-        sa.Column('password_hash', sa.String(255), nullable=False),
-        sa.Column('full_name', sa.String(200), nullable=True),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('is_superuser', sa.Boolean(), nullable=False, server_default='false'),
-        sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
-        sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now()),
-    )
-    op.create_index('ix_users_email', 'users', ['email'], unique=True)
-    op.create_index('ix_users_username', 'users', ['username'], unique=True)
-    op.create_index('ix_users_is_active', 'users', ['is_active'])
-    op.create_index('idx_users_email_active', 'users', ['email', 'is_active'])
+    # Users table will be created in migration 20251110_0100
 
 
 def downgrade() -> None:
-    op.drop_table('users')
+    # users table dropped in migration 20251110_0100
     op.drop_table('conversations')
     op.drop_table('dashboards')
     op.drop_table('es_servers')

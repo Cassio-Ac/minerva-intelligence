@@ -4,6 +4,7 @@ Modelos SQLAlchemy para metadados do sistema
 """
 
 from sqlalchemy import Column, String, Text, DateTime, Boolean, JSON, ForeignKey, Index
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -24,7 +25,7 @@ class ESServer(Base):
     """
     __tablename__ = "es_servers"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False, unique=True, index=True)
     url = Column(String(500), nullable=False)
     username = Column(String(100), nullable=True)
@@ -69,11 +70,11 @@ class Dashboard(Base):
     """
     __tablename__ = "dashboards"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
+    id = Column(UUID(as_uuid=False), primary_key=True, default=generate_uuid)
     title = Column(String(200), nullable=False, index=True)
     description = Column(Text, nullable=True)
     index = Column(String(255), nullable=False, index=True)  # Índice ES associado
-    server_id = Column(String(36), ForeignKey("es_servers.id", ondelete="SET NULL"), nullable=True)
+    server_id = Column(UUID(as_uuid=False), ForeignKey("es_servers.id", ondelete="SET NULL"), nullable=True)
 
     # Layout e widgets em JSON
     layout = Column(JSON, nullable=False, default=dict)
@@ -105,10 +106,10 @@ class Conversation(Base):
     """
     __tablename__ = "conversations"
 
-    id = Column(String(36), primary_key=True, default=generate_uuid)
+    id = Column(UUID(as_uuid=False), primary_key=True, default=generate_uuid)
     title = Column(String(200), nullable=False, index=True)
     index = Column(String(255), nullable=True, index=True)  # Primary índice ES (opcional)
-    server_id = Column(String(36), ForeignKey("es_servers.id", ondelete="SET NULL"), nullable=True)
+    server_id = Column(UUID(as_uuid=False), ForeignKey("es_servers.id", ondelete="SET NULL"), nullable=True)
 
     # Mensagens em JSON (array de objetos)
     # Cada mensagem: {id, role, content, timestamp, widget: {title, type, query, data, config}}

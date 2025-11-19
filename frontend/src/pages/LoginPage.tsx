@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { API_URL } from '../config/api';
 
 interface SSOProvider {
   id: string;
@@ -35,7 +36,7 @@ export const LoginPage: React.FC = () => {
   useEffect(() => {
     const fetchProviders = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/v1/auth/sso/providers');
+        const response = await fetch(`${API_URL}/auth/sso/providers`);
         if (response.ok) {
           const data = await response.json();
           setSsoProviders(data);
@@ -173,7 +174,7 @@ export const LoginPage: React.FC = () => {
               marginBottom: '8px',
             }}
           >
-            Dashboard AI
+            Minerva Intelligence Platform
           </h1>
           <p
             style={{
@@ -387,7 +388,7 @@ export const LoginPage: React.FC = () => {
               provider.provider_type === 'entra_id' ? (
                 <a
                   key={provider.id}
-                  href={`http://localhost:8000/api/v1/auth/sso/${provider.id}/login`}
+                  href={`${API_URL}/auth/sso/${provider.id}/login`}
                   style={{
                     display: 'flex',
                     alignItems: 'center',

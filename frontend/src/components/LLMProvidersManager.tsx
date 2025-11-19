@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSettingsStore } from '@stores/settingsStore';
 import axios from 'axios';
+import { API_URL } from '../config/api';
 
 interface LLMProvider {
   id: string;
@@ -55,7 +56,7 @@ export const LLMProvidersManager: React.FC = () => {
   const loadProviders = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/v1/llm-providers');
+      const response = await axios.get(`${API_URL}/llm-providers`);
       setProviders(response.data);
     } catch (error) {
       console.error('Error loading providers:', error);
@@ -66,7 +67,7 @@ export const LLMProvidersManager: React.FC = () => {
 
   const loadModelSuggestions = async () => {
     try {
-      const response = await axios.get('/api/v1/llm-providers/models/suggestions');
+      const response = await axios.get(`${API_URL}/llm-providers/models/suggestions`);
       setModelSuggestions(response.data);
     } catch (error) {
       console.error('Error loading model suggestions:', error);
@@ -126,11 +127,11 @@ export const LLMProvidersManager: React.FC = () => {
           updateData.api_base_url = formData.api_base_url;
         }
 
-        await axios.put(`/api/v1/llm-providers/${editingProvider.id}`, updateData);
+        await axios.put(`${API_URL}/llm-providers/${editingProvider.id}`, updateData);
         setEditingProvider(null);
       } else {
         // Create new provider
-        await axios.post('/api/v1/llm-providers', formData);
+        await axios.post(`${API_URL}/llm-providers`, formData);
         setShowAddForm(false);
       }
 
@@ -155,7 +156,7 @@ export const LLMProvidersManager: React.FC = () => {
 
   const handleSetDefault = async (providerId: string) => {
     try {
-      await axios.post(`/api/v1/llm-providers/${providerId}/set-default`);
+      await axios.post(`${API_URL}/llm-providers/${providerId}/set-default`);
       await loadProviders();
     } catch (error) {
       console.error('Error setting default provider:', error);
@@ -168,7 +169,7 @@ export const LLMProvidersManager: React.FC = () => {
     }
 
     try {
-      await axios.delete(`/api/v1/llm-providers/${providerId}`);
+      await axios.delete(`${API_URL}/llm-providers/${providerId}`);
       await loadProviders();
     } catch (error) {
       console.error('Error deleting provider:', error);

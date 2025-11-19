@@ -3,7 +3,7 @@ Elasticsearch Client
 Cliente async para conexão com Elasticsearch
 """
 
-from elasticsearch import AsyncElasticsearch
+from elasticsearch import AsyncElasticsearch, Elasticsearch
 from typing import Optional, Dict, Any, List
 import logging
 
@@ -105,6 +105,39 @@ async def get_es_client() -> AsyncElasticsearch:
 async def ping_elasticsearch() -> bool:
     """Helper para testar conexão"""
     return await ElasticsearchClient.ping()
+
+
+def get_sync_es_client() -> Elasticsearch:
+    """
+    Helper para obter cliente ES síncrono (para RSS e outras tasks)
+    Cria uma nova instância do cliente sync baseado na configuração padrão
+    """
+    from app.core.config import settings
+
+    url = settings.ES_URL or "http://localhost:9200"
+    username = settings.ES_USERNAME
+    password = settings.ES_PASSWORD
+
+    if username and password:
+        return Elasticsearch(
+            [url],
+            basic_auth=(username, password),
+            verify_certs=False,
+            request_timeout=30,
+        )
+    else:
+        return Elasticsearch(
+            [url],
+            verify_certs=False,
+            request_timeout=30,
+        )
+
+
+def get_sync_es_dependency() -> Elasticsearch:
+    """
+    Dependency para FastAPI endpoints que precisam de cliente ES síncrono
+    """
+    return get_sync_es_client()
 
 
 # Inicializar índices necessários

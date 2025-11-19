@@ -35,36 +35,59 @@ class FieldInfo(BaseModel):
 
 @router.get("/indices", response_model=List[IndexInfo])
 async def list_indices(
-    pattern: str = Query("*", description="Index pattern (e.g., 'log-*')")
+    pattern: str = Query("*", description="Index pattern (e.g., 'log-*')"),
+    server_id: Optional[str] = Query(None, description="ES Server ID"),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Lista índices Elasticsearch
 
     - **pattern**: Padrão de índices (default: '*')
+    - **server_id**: ID do servidor ES (opcional)
     """
-    logger.info(f"Listing ES indices with pattern: {pattern}")
+    try:
+        logger.info(
+            f"User {current_user.username} listing ES indices with pattern: {pattern} "
+            f"(server: {server_id or 'default'})"
+        )
 
-    # TODO: Implementar listagem de índices
-    # indices = await elasticsearch_service.list_indices(pattern)
-    # return indices
+        es_service = get_es_service()
+        indices = await es_service.list_indices(pattern, server_id)
 
-    raise HTTPException(status_code=501, detail="Not implemented yet")
+        logger.info(f"✅ Found {len(indices)} indices")
+        return indices
+
+    except Exception as e:
+        logger.error(f"❌ Error listing indices: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/indices/{index_name}/mapping", response_model=Dict[str, Any])
-async def get_mapping(index_name: str):
+async def get_mapping(
+    index_name: str,
+    server_id: Optional[str] = Query(None, description="ES Server ID"),
+    current_user: User = Depends(get_current_user)
+):
     """
     Obtém mapeamento de um índice
 
     - **index_name**: Nome do índice
+    - **server_id**: ID do servidor ES (opcional)
     """
-    logger.info(f"Getting mapping for index: {index_name}")
+    try:
+        logger.info(
+            f"User {current_user.username} getting mapping for index: {index_name} "
+            f"(server: {server_id or 'default'})"
+        )
 
-    # TODO: Implementar obtenção de mapping
-    # mapping = await elasticsearch_service.get_mapping(index_name)
-    # return mapping
+        es_service = get_es_service()
+        mapping = await es_service.get_index_mapping(index_name, server_id)
 
-    raise HTTPException(status_code=501, detail="Not implemented yet")
+        return mapping
+
+    except Exception as e:
+        logger.error(f"❌ Error getting mapping for index {index_name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/indices/{index_name}/fields", response_model=List[FieldInfo])
@@ -127,14 +150,26 @@ async def get_fields(
 
 
 @router.get("/health")
-async def elasticsearch_health():
+async def elasticsearch_health(
+    server_id: Optional[str] = Query(None, description="ES Server ID"),
+    current_user: User = Depends(get_current_user)
+):
     """
     Verifica saúde do cluster Elasticsearch
+
+    - **server_id**: ID do servidor ES (opcional)
     """
-    logger.info("Checking ES health")
+    try:
+        logger.info(
+            f"User {current_user.username} checking ES health "
+            f"(server: {server_id or 'default'})"
+        )
 
-    # TODO: Implementar health check
-    # health = await elasticsearch_service.cluster_health()
-    # return health
+        es_service = get_es_service()
+        health = await es_service.cluster_health(server_id)
 
-    raise HTTPException(status_code=501, detail="Not implemented yet")
+        return health
+
+    except Exception as e:
+        logger.error(f"❌ Error checking ES health: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

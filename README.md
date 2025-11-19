@@ -1,4 +1,4 @@
-# 🧠 Intelligence Platform v1.0
+# 🧠 Minerva - Intelligence Platform v1.0
 
 **Plataforma de Análise de Inteligência baseada em Múltiplas Fontes de Dados**
 
@@ -8,7 +8,7 @@
 
 ## 🎯 Sobre
 
-Intelligence Platform é uma plataforma completa para análise de inteligência baseada em múltiplas fontes de dados. Diferente de um agregador de KPIs, este projeto foca em correlação de dados, análise temporal e extração de insights estratégicos.
+**Minerva** é uma plataforma completa para análise de inteligência baseada em múltiplas fontes de dados. Diferente de um agregador de KPIs, este projeto foca em correlação de dados, análise temporal e extração de insights estratégicos.
 
 ### ✨ Principais Features
 

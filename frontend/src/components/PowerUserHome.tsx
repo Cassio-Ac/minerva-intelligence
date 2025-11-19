@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSettingsStore } from '@stores/settingsStore';
 import { useAuthStore } from '@stores/authStore';
+import { API_URL, API_BASE_URL } from '../config/api';
 
 interface Conversation {
   id: string;
@@ -35,7 +36,7 @@ export const PowerUserHome: React.FC = () => {
     const fetchData = async () => {
       try {
         // Buscar conversas recentes
-        const convResponse = await fetch('http://localhost:8000/api/v1/conversations?limit=5', {
+        const convResponse = await fetch(`${API_URL}/conversations?limit=5`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (convResponse.ok) {
@@ -44,7 +45,7 @@ export const PowerUserHome: React.FC = () => {
         }
 
         // Buscar dashboards do usuário
-        const dashResponse = await fetch('http://localhost:8000/api/v1/dashboards?limit=6', {
+        const dashResponse = await fetch(`${API_URL}/dashboards?limit=6`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (dashResponse.ok) {

@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSettingsStore } from '@stores/settingsStore';
 import { useAuthStore } from '@stores/authStore';
+import { API_URL, API_BASE_URL } from '../config/api';
 
 interface Dashboard {
   id: string;
@@ -27,7 +28,7 @@ export const ReaderHome: React.FC = () => {
   useEffect(() => {
     const fetchDashboards = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/v1/dashboards', {
+        const response = await fetch(`${API_URL}/dashboards`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (response.ok) {

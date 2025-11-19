@@ -162,7 +162,7 @@ async def test_server_connection(server_id: str):
 
 
 @router.get("/{server_id}/indices", response_model=List[ESIndexInfo])
-async def list_server_indices(server_id: str):
+async def list_server_indices(server_id: str, db: AsyncSession = Depends(get_db)):
     """
     Lista todos os índices de um servidor Elasticsearch
 
@@ -170,8 +170,8 @@ async def list_server_indices(server_id: str):
     """
     logger.info(f"Listing indices from ES server: {server_id}")
 
-    service = get_es_server_service()
-    indices = await service.get_indices(server_id)
+    service_sql = get_es_server_service_sql()
+    indices = await service_sql.get_indices(db, server_id)
 
     logger.info(f"📚 Found {len(indices)} indices in server {server_id}")
     return indices

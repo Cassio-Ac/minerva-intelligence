@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { API_URL, API_BASE_URL } from '../config/api';
 import {
   BookOpen,
   Plus,
@@ -43,7 +44,7 @@ export const KnowledgeBase: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:8000/api/v1/knowledge-docs/');
+      const response = await fetch(`${API_URL}/knowledge-docs/`);
       const data = await response.json();
       setKnowledgeDocs(data);
     } catch (err) {
@@ -57,7 +58,7 @@ export const KnowledgeBase: React.FC = () => {
     if (!confirm('Are you sure you want to delete this document?')) return;
 
     try {
-      await fetch(`http://localhost:8000/api/v1/knowledge-docs/${id}`, {
+      await fetch(`${API_URL}/knowledge-docs/${id}`, {
         method: 'DELETE'
       });
       await loadData();
@@ -68,7 +69,7 @@ export const KnowledgeBase: React.FC = () => {
 
   const createKnowledgeDoc = async (docData: any) => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/knowledge-docs/', {
+      const response = await fetch(`${API_URL}/knowledge-docs/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(docData)
@@ -234,7 +235,7 @@ const AddDocumentForm: React.FC<{
     const fetchIndices = async () => {
       try {
         // Primeiro buscar servidores disponíveis
-        const serversResponse = await fetch('http://localhost:8000/api/v1/es-servers/');
+        const serversResponse = await fetch(`${API_URL}/es-servers/`);
         if (!serversResponse.ok) return;
 
         const servers = await serversResponse.json();
@@ -244,7 +245,7 @@ const AddDocumentForm: React.FC<{
         const serverId = servers[0].id;
 
         // Buscar índices do servidor
-        const indicesResponse = await fetch(`http://localhost:8000/api/v1/es-servers/${serverId}/indices`);
+        const indicesResponse = await fetch(`${API_URL}/es-servers/${serverId}/indices`);
         if (indicesResponse.ok) {
           const data = await indicesResponse.json();
           // Extrair apenas os nomes dos índices

@@ -36,6 +36,12 @@ interface RSSArticle {
   sentiment?: string;
   entities?: string[];
   keywords?: string[];
+  // Malpedia enrichment fields
+  enriched_summary?: string;
+  actors_mentioned?: string[];
+  families_mentioned?: string[];
+  enriched_at?: string;
+  enrichment_version?: string;
 }
 
 interface RSSStats {

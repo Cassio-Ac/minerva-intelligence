@@ -11,9 +11,9 @@ import {
   ESServerTestResult,
   ESIndexInfo,
 } from '../types/elasticsearch';
+import { API_URL } from '../config/api';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const BASE_PATH = '/api/v1/es-servers';
+const BASE_PATH = '/es-servers';
 
 export const esServerApi = {
   /**

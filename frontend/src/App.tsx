@@ -11,6 +11,11 @@ import { ProfilePage } from '@pages/ProfilePage'
 import { DownloadsPage } from '@pages/DownloadsPage'
 import { CSVUploadPage } from '@pages/CSVUploadPage'
 import { HomePage } from '@pages/HomePage'
+import InfoPage from '@pages/InfoPage'
+import DataLeaksPage from '@pages/DataLeaksPage'
+import CVEPage from '@pages/CVEPage'
+import TelegramIntelligence from '@pages/TelegramIntelligence'
+import TelegramConversation from '@pages/TelegramConversation'
 import { Header } from './components/Header'
 import { useDashboardStore } from '@stores/dashboardStore'
 import { useSettingsStore } from '@stores/settingsStore'
@@ -81,7 +86,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100%', maxWidth: '100vw', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100%', maxWidth: '100vw', overflow: 'hidden' }}>
         <Header />
         <main style={{ flex: 1, width: '100%', maxWidth: '100vw', overflow: 'hidden' }}>
           <Routes>
@@ -106,6 +111,19 @@ function App() {
 
         {/* Chat Page */}
         <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+
+        {/* Info Page (RSS Intelligence) */}
+        <Route path="/info" element={<ProtectedRoute><InfoPage /></ProtectedRoute>} />
+
+        {/* Data Leaks Page */}
+        <Route path="/leaks" element={<ProtectedRoute><DataLeaksPage /></ProtectedRoute>} />
+
+        {/* CVE Page */}
+        <Route path="/cves" element={<ProtectedRoute><CVEPage /></ProtectedRoute>} />
+
+        {/* Telegram Intelligence */}
+        <Route path="/telegram" element={<ProtectedRoute><TelegramIntelligence /></ProtectedRoute>} />
+        <Route path="/telegram/conversation" element={<ProtectedRoute><TelegramConversation /></ProtectedRoute>} />
 
         {/* Profile Page */}
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />

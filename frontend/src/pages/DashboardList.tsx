@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSettingsStore } from '../stores/settingsStore';
 import { getThemeColors } from '../utils/themeStyles';
+import { API_URL, API_BASE_URL } from '../config/api';
 
 interface Dashboard {
   id: string;
@@ -29,7 +30,7 @@ export default function DashboardList() {
   const fetchDashboards = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8000/api/v1/dashboards/');
+      const response = await fetch(`${API_URL}/dashboards/`);
       if (!response.ok) {
         throw new Error('Failed to fetch dashboards');
       }
@@ -57,7 +58,7 @@ export default function DashboardList() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/dashboards/${dashboardId}`, {
+      const response = await fetch(`${API_URL}/dashboards/${dashboardId}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
