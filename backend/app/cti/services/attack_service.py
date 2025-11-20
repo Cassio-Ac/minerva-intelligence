@@ -8,6 +8,9 @@ Cache: Dados são carregados na memória na primeira chamada e reutilizados.
 """
 
 import logging
+import requests
+import tempfile
+import json
 from typing import List, Dict, Any, Optional
 from functools import lru_cache
 
@@ -35,10 +38,25 @@ class AttackService:
         if not self._loaded:
             logger.info("📥 Loading MITRE ATT&CK data from official STIX repository...")
             try:
-                # Carrega Enterprise ATT&CK data
-                # Isso baixa os dados STIX mais recentes do repositório GitHub da MITRE
-                self._attack_data = MitreAttackData("enterprise-attack")
+                # Baixa os dados STIX do GitHub
+                stix_url = "https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json"
+                logger.info(f"   Downloading from: {stix_url}")
+
+                response = requests.get(stix_url, timeout=30)
+                response.raise_for_status()
+
+                # Salva em arquivo temporário (a biblioteca precisa de um arquivo)
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp:
+                    json.dump(response.json(), tmp)
+                    tmp_path = tmp.name
+
+                # Carrega os dados STIX do arquivo temporário
+                self._attack_data = MitreAttackData(tmp_path)
                 self._loaded = True
+
+                # Remove arquivo temporário
+                import os
+                os.unlink(tmp_path)
 
                 # Log statistics
                 techniques = self._attack_data.get_techniques(remove_revoked_deprecated=True)

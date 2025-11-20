@@ -119,6 +119,44 @@ async def get_actor_detail(
         )
 
 
+@router.get("/meta/countries")
+async def get_actor_countries(
+    server_id: Optional[str] = Query(None, description="ES server ID"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get list of all unique countries from threat actors
+
+    - **server_id**: Optional ES server ID
+
+    Returns list of country names sorted alphabetically.
+    """
+    try:
+        service = get_malpedia_service(server_id=server_id)
+
+        # Get all actors
+        result = await service.get_actors(page=1, page_size=1000)
+        actors = result.get("actors", [])
+
+        # Extract unique countries
+        countries = set()
+        for actor in actors:
+            country = actor.get("country")
+            if country:
+                countries.add(country)
+
+        return {
+            "countries": sorted(list(countries))
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error getting actor countries: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting actor countries: {str(e)}"
+        )
+
+
 @router.get("/{actor_name}/families")
 async def get_actor_families(
     actor_name: str,

@@ -49,6 +49,10 @@ pyyaml==6.0.1
 celery==5.3.4
 requests==2.31.0
 
+# Web Scraping (Malpedia sync)
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
 # SSO & OAuth2
 authlib==1.3.0
 msal==1.28.0

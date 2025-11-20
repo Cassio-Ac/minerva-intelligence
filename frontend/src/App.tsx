@@ -16,6 +16,7 @@ import DataLeaksPage from '@pages/DataLeaksPage'
 import CVEPage from '@pages/CVEPage'
 import TelegramIntelligence from '@pages/TelegramIntelligence'
 import TelegramConversation from '@pages/TelegramConversation'
+import CTIDashboard from '@pages/cti/CTIDashboard'
 import { Header } from './components/Header'
 import { useDashboardStore } from '@stores/dashboardStore'
 import { useSettingsStore } from '@stores/settingsStore'
@@ -124,6 +125,9 @@ function App() {
         {/* Telegram Intelligence */}
         <Route path="/telegram" element={<ProtectedRoute><TelegramIntelligence /></ProtectedRoute>} />
         <Route path="/telegram/conversation" element={<ProtectedRoute><TelegramConversation /></ProtectedRoute>} />
+
+        {/* CTI Dashboard */}
+        <Route path="/cti" element={<ProtectedRoute><CTIDashboard /></ProtectedRoute>} />
 
         {/* Profile Page */}
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />

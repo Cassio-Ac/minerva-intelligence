@@ -46,6 +46,7 @@ export const Header: React.FC = () => {
     { path: '/leaks', label: 'Data Leaks', icon: '⚠️' },
     { path: '/cves', label: 'CVEs', icon: '🛡️' },
     { path: '/telegram', label: 'Telegram', icon: '✈️' },
+    { path: '/cti', label: 'CTI', icon: '🎯' },
     { path: '/downloads', label: 'Downloads', icon: '⬇️' },
     { path: '/settings', label: 'Configurações', icon: '⚙️', requiresAdmin: true },
   ];

@@ -64,6 +64,34 @@ async def list_techniques(
         )
 
 
+@router.get("/stats")
+async def get_stats(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get statistics about ATT&CK data
+
+    Returns:
+    - **total_tactics**: Number of tactics
+    - **total_techniques**: Number of techniques
+    - **total_subtechniques**: Number of sub-techniques
+    - **total_mitigations**: Number of mitigations
+    - **matrix_size**: Dimensions of the matrix
+    """
+    try:
+        service = get_attack_service()
+        stats = service.get_stats()
+
+        return stats
+
+    except Exception as e:
+        logger.error(f"❌ Error getting stats: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting stats: {str(e)}"
+        )
+
+
 @router.get("/matrix", response_model=TechniqueMatrixResponse)
 async def get_matrix(
     current_user: dict = Depends(get_current_user)
@@ -163,8 +191,14 @@ async def highlight_techniques(
     """
     Highlight techniques based on selected actors/families
 
-    This endpoint will compute which ATT&CK techniques to highlight
+    This endpoint computes which ATT&CK techniques to highlight
     based on the user's selection of threat actors or malware families.
+
+    Strategy:
+    1. Actors: Extract MITRE Group IDs from Malpedia data
+    2. Query MITRE ATT&CK for techniques used by those groups
+    3. Families: Get actors using the family, then get their techniques
+    4. Return unified list of techniques to highlight
 
     - **actors**: List of selected actor names
     - **families**: List of selected family names
@@ -173,59 +207,39 @@ async def highlight_techniques(
     Returns:
     - **highlighted_techniques**: List of technique IDs to highlight
     - **technique_details**: Details for each highlighted technique
-
-    Note: Currently returns placeholder data. Full implementation requires
-    enrichment of Malpedia data with ATT&CK techniques.
+    - **stats**: Statistics about the enrichment
     """
     try:
-        # TODO: Implement enrichment service to map families/actors to techniques
-        # For now, return empty/placeholder response
+        from ..services.enrichment_service import get_enrichment_service
 
-        logger.warning(
-            "⚠️ Highlight endpoint called but enrichment not yet implemented. "
-            f"Actors: {request.actors}, Families: {request.families}"
+        logger.info(
+            f"🎯 Highlight endpoint called - "
+            f"Actors: {request.actors}, Families: {request.families}, Mode: {request.mode}"
+        )
+
+        # Use enrichment service
+        enrichment_service = get_enrichment_service()
+
+        result = await enrichment_service.highlight_techniques(
+            actors=request.actors,
+            families=request.families,
+            mode=request.mode or 'union'
+        )
+
+        logger.info(
+            f"✅ Enrichment complete - "
+            f"Highlighted {len(result['highlighted_techniques'])} techniques"
         )
 
         return TechniqueHighlightResponse(
-            highlighted_techniques=[],
-            technique_details={},
-            message=(
-                "Enrichment service not yet implemented. "
-                "Need to map Malpedia families/actors to ATT&CK techniques."
-            )
+            highlighted_techniques=result['highlighted_techniques'],
+            technique_details=result['technique_details'],
+            message=result.get('message')
         )
 
     except Exception as e:
-        logger.error(f"❌ Error highlighting techniques: {e}")
+        logger.error(f"❌ Error highlighting techniques: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error highlighting techniques: {str(e)}"
-        )
-
-
-@router.get("/stats")
-async def get_stats(
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Get statistics about ATT&CK data
-
-    Returns:
-    - **total_tactics**: Number of tactics
-    - **total_techniques**: Number of techniques
-    - **total_subtechniques**: Number of sub-techniques
-    - **total_mitigations**: Number of mitigations
-    - **matrix_size**: Dimensions of the matrix
-    """
-    try:
-        service = get_attack_service()
-        stats = service.get_stats()
-
-        return stats
-
-    except Exception as e:
-        logger.error(f"❌ Error getting stats: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting stats: {str(e)}"
         )

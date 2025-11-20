@@ -54,19 +54,23 @@ class TechniqueDetailResponse(TechniqueResponse):
 class TechniqueListResponse(BaseModel):
     """Response for technique list endpoint"""
     total: int = Field(..., description="Total number of techniques")
-    techniques: List[TechniqueResponse] = Field(..., description="List of techniques")
-    page: Optional[int] = Field(1, description="Current page number")
-    page_size: Optional[int] = Field(20, description="Items per page")
+    techniques: List[Dict[str, Any]] = Field(..., description="List of techniques")
+
+    class Config:
+        extra = "allow"
 
 
 class TechniqueMatrixResponse(BaseModel):
     """Response for ATT&CK matrix visualization"""
-    tactics: List[TacticInfo] = Field(..., description="All tactics in order")
-    matrix: Dict[str, List[TechniqueResponse]] = Field(
+    tactics: List[Dict[str, Any]] = Field(..., description="All tactics in order")
+    techniques: List[Dict[str, Any]] = Field(..., description="All techniques")
+    matrix: Dict[str, List[str]] = Field(
         ...,
-        description="Matrix structure: {tactic_id: [techniques]}"
+        description="Matrix structure: {tactic_id: [technique_ids]}"
     )
-    total_techniques: int = Field(..., description="Total techniques in matrix")
+
+    class Config:
+        extra = "allow"
 
 
 class TechniqueHighlightRequest(BaseModel):
@@ -79,7 +83,8 @@ class TechniqueHighlightRequest(BaseModel):
 class TechniqueHighlightResponse(BaseModel):
     """Response with highlighted techniques"""
     highlighted_techniques: List[str] = Field(..., description="List of technique IDs to highlight")
-    total_highlighted: int = Field(..., description="Number of highlighted techniques")
-    actors: List[str] = Field(..., description="Actors included in selection")
-    families: List[str] = Field(..., description="Families included in selection")
-    mode: str = Field(..., description="Highlight mode used")
+    technique_details: Dict[str, Any] = Field(default_factory=dict, description="Details for each highlighted technique")
+    message: Optional[str] = Field(None, description="Optional message (e.g., enrichment not available)")
+
+    class Config:
+        extra = "allow"

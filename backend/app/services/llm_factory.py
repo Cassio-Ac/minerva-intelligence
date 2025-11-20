@@ -148,24 +148,40 @@ class LLMFactory:
         try:
             from app.core.config import settings
 
+            # Check if OpenAI is configured
+            openai_key = getattr(settings, 'OPENAI_API_KEY', None)
+            openai_model = getattr(settings, 'OPENAI_MODEL', None)
+            llm_provider = getattr(settings, 'LLM_PROVIDER', None)
+
+            # Priority 1: OpenAI if explicitly set as LLM_PROVIDER
+            if llm_provider == 'openai' and openai_key:
+                client = OpenAIClient(
+                    api_key=openai_key,
+                    model_name=openai_model or 'gpt-4o-mini',
+                    temperature=settings.LLM_TEMPERATURE,
+                    max_tokens=settings.LLM_MAX_TOKENS,
+                )
+                logger.info(f"✅ Created OpenAI client from env: {openai_model or 'gpt-4o-mini'}")
+                return client
+
+            # Priority 2: Databricks (backward compatibility)
             databricks_url = settings.DATABRICKS_URL or settings.DATABRICKS_HOST
             databricks_token = settings.DATABRICKS_TOKEN
             model_name = settings.DATABRICKS_MODEL or settings.LLM_MODEL
 
-            if not databricks_url or not databricks_token:
-                logger.warning("⚠️ DATABRICKS_URL and DATABRICKS_TOKEN not set in .env")
-                return None
+            if databricks_url and databricks_token:
+                client = DatabricksClient(
+                    api_key=databricks_token,
+                    model_name=model_name,
+                    temperature=settings.LLM_TEMPERATURE,
+                    max_tokens=settings.LLM_MAX_TOKENS,
+                    api_base_url=databricks_url,
+                )
+                logger.info(f"✅ Created Databricks client from env: {model_name}")
+                return client
 
-            client = DatabricksClient(
-                api_key=databricks_token,
-                model_name=model_name,
-                temperature=settings.LLM_TEMPERATURE,
-                max_tokens=settings.LLM_MAX_TOKENS,
-                api_base_url=databricks_url,
-            )
-
-            logger.info(f"✅ Created Databricks client from env: {model_name}")
-            return client
+            logger.warning("⚠️ No LLM provider configured in .env")
+            return None
 
         except Exception as e:
             logger.error(f"❌ Error creating LLM client from env: {e}")

@@ -72,6 +72,7 @@ Este projeto usa portas customizadas para evitar conflitos com Dashboard AI v2:
 
 | Módulo | Status | Descrição | Documentação |
 |--------|--------|-----------|--------------|
+| 🎯 **CTI (Cyber Threat Intelligence)** | ✅ Operacional | 864 actors, MITRE ATT&CK + LLM enrichment | [ROTINAS_CTI_COMPLETAS.md](ROTINAS_CTI_COMPLETAS.md) |
 | 📡 **RSS Intelligence** | ✅ Operacional | 800+ artigos, 38 fontes, chat RAG | [docs/RESUMO_RSS_INTELLIGENCE.md](docs/RESUMO_RSS_INTELLIGENCE.md) |
 | 💬 **Telegram Intelligence** | ✅ Operacional | 150+ grupos, busca, contexto, análise | [docs/TELEGRAM_INTELLIGENCE_FIXES.md](docs/TELEGRAM_INTELLIGENCE_FIXES.md) |
 | 🔒 **CVE Intelligence** | ✅ Operacional | Tracking de vulnerabilidades CVE | Página: `/cve` |
@@ -214,6 +215,7 @@ PostgreSQL  Redis  Elasticsearch  LLM APIs
 - [📦 MCP RSS Server](docs/MCP_RSS_README.md)
 - [🔁 Rotinas de Manutenção](docs/ROTINAS.md)
 - [🔧 Technical Details](docs/TECHNICAL_DETAILS.md)
+- [🔄 **Rotinas CTI Completas**](ROTINAS_CTI_COMPLETAS.md) ⭐ **NOVO**
 
 ### 📊 Planejamento e Status
 
