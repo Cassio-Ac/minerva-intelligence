@@ -174,8 +174,8 @@ class IOCEnrichmentService {
 **Acesso**:
 - Menu Header: **CTI** → `/cti`
 - Direct URLs:
-  - `http://localhost:5180/cti/feeds`
-  - `http://localhost:5180/cti/enrichment`
+  - `http://localhost:5181/cti/feeds` (frontend dev mode)
+  - `http://localhost:5181/cti/enrichment` (frontend dev mode)
 
 ---
 
@@ -274,8 +274,8 @@ npm run dev
 ```
 
 Acesse:
-- MISP Feeds: http://localhost:5180/cti/feeds
-- IOC Enrichment: http://localhost:5180/cti/enrichment
+- MISP Feeds: http://localhost:5181/cti/feeds
+- IOC Enrichment: http://localhost:5181/cti/enrichment
 
 ---
 
@@ -283,7 +283,7 @@ Acesse:
 
 ### Teste 1: MISP Feeds
 
-1. Acesse `http://localhost:5180/cti/feeds`
+1. Acesse `http://localhost:5181/cti/feeds`
 2. Selecione "DiamondFox C2 Panels (Unit42)"
 3. Deixe limite em 5
 4. Clique em "Testar Feed"
@@ -316,7 +316,7 @@ Acesse:
 
 ### Teste 3: IOC Enrichment
 
-1. Acesse `http://localhost:5180/cti/enrichment`
+1. Acesse `http://localhost:5181/cti/enrichment`
 2. Selecione "DiamondFox C2 Panels"
 3. Limite: 3 IOCs
 4. Clique em "Enriquecer"
