@@ -3,7 +3,7 @@
  * Service para enriquecer IOCs usando LLM e threat intelligence
  */
 
-import api from '../api';
+import { api } from '../api';
 import { MISPIoC } from './mispFeedsService';
 
 export interface IOCEnrichment {

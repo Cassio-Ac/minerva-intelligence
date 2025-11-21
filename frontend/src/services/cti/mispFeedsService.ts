@@ -3,7 +3,7 @@
  * Service para interagir com feeds MISP de threat intelligence
  */
 
-import api from '../api';
+import { api } from '../api';
 
 export interface MISPFeed {
   id: string;
