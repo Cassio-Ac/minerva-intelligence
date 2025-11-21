@@ -58,6 +58,42 @@ class MISPFeedService:
             "description": "AlienVault OTX pulses (~2000 IOCs/day)",
             "requires_auth": True,  # Requires API key
         },
+        # Tier 1 Feeds (High Priority)
+        "openphish": {
+            "name": "OpenPhish",
+            "url": "https://raw.githubusercontent.com/openphish/public_feed/refs/heads/main/feed.txt",
+            "type": "txt",
+            "description": "Phishing URLs feed (daily updates)",
+            "requires_auth": False,
+        },
+        "serpro": {
+            "name": "SERPRO Blocklist (BR Gov)",
+            "url": "https://s3.i02.estaleiro.serpro.gov.br/blocklist/blocklist.txt",
+            "type": "txt",
+            "description": "Brazilian government malicious IPs blocklist",
+            "requires_auth": False,
+        },
+        "bambenek_dga": {
+            "name": "Bambenek DGA Feed",
+            "url": "https://osint.bambenekconsulting.com/feeds/dga-feed-high.csv",
+            "type": "csv",
+            "description": "Domain Generation Algorithm (DGA) domains for C2 detection",
+            "requires_auth": False,
+        },
+        "emerging_threats": {
+            "name": "ProofPoint Emerging Threats",
+            "url": "https://rules.emergingthreats.net/blockrules/compromised-ips.txt",
+            "type": "txt",
+            "description": "Compromised IPs (bots, proxies, C2)",
+            "requires_auth": False,
+        },
+        "alienvault_reputation": {
+            "name": "AlienVault IP Reputation",
+            "url": "https://reputation.alienvault.com/reputation.generic",
+            "type": "reputation",
+            "description": "IP reputation feed (malware, phishing, C2)",
+            "requires_auth": False,
+        },
     }
 
     def __init__(self, db: Optional[AsyncSession] = None, es: Optional[AsyncElasticsearch] = None):
@@ -402,6 +438,290 @@ class MISPFeedService:
 
         except Exception as e:
             logger.error(f"❌ Error fetching OTX feed: {e}")
+            return []
+
+    def fetch_openphish_feed(self, limit: int = 1000) -> List[Dict]:
+        """
+        Importa URLs de phishing do OpenPhish feed
+
+        Args:
+            limit: Número máximo de URLs para processar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching OpenPhish feed (limit={limit})...")
+
+        try:
+            url = self.FEEDS["openphish"]["url"]
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            iocs = []
+            lines = response.text.strip().split('\n')
+
+            for line in lines[:limit]:
+                phishing_url = line.strip()
+                if not phishing_url or phishing_url.startswith('#'):
+                    continue
+
+                ioc = {
+                    "type": "url",
+                    "subtype": "url",
+                    "value": phishing_url,
+                    "context": "OpenPhish: Phishing URL",
+                    "tags": ["phishing", "openphish"],
+                    "malware_family": None,
+                    "threat_actor": None,
+                    "tlp": "amber",
+                    "first_seen": None,
+                    "to_ids": True,
+                }
+                iocs.append(ioc)
+
+            logger.info(f"✅ Extracted {len(iocs)} phishing URLs from OpenPhish")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching OpenPhish feed: {e}")
+            return []
+
+    def fetch_serpro_feed(self, limit: int = 10000) -> List[Dict]:
+        """
+        Importa IPs maliciosos do SERPRO (Governo BR)
+
+        Args:
+            limit: Número máximo de IPs para processar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching SERPRO blocklist (limit={limit})...")
+
+        try:
+            url = self.FEEDS["serpro"]["url"]
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            iocs = []
+            lines = response.text.strip().split('\n')
+
+            for line in lines[:limit]:
+                ip = line.strip()
+                if not ip or ip.startswith('#'):
+                    continue
+
+                ioc = {
+                    "type": "ip",
+                    "subtype": "ip-dst",
+                    "value": ip,
+                    "context": "SERPRO: Malicious IP (BR Gov)",
+                    "tags": ["malicious_ip", "serpro", "brazil"],
+                    "malware_family": None,
+                    "threat_actor": None,
+                    "tlp": "amber",
+                    "first_seen": None,
+                    "to_ids": True,
+                }
+                iocs.append(ioc)
+
+            logger.info(f"✅ Extracted {len(iocs)} malicious IPs from SERPRO")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching SERPRO feed: {e}")
+            return []
+
+    def fetch_bambenek_dga_feed(self, limit: int = 1000) -> List[Dict]:
+        """
+        Importa domains DGA do Bambenek feed (C2 detection)
+
+        Args:
+            limit: Número máximo de domains para processar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching Bambenek DGA feed (limit={limit})...")
+
+        try:
+            url = self.FEEDS["bambenek_dga"]["url"]
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            iocs = []
+            lines = response.text.strip().split('\n')
+
+            # Skip header lines (começam com #)
+            data_lines = [line for line in lines if not line.startswith('#')][:limit]
+
+            for line in data_lines:
+                try:
+                    # CSV format: Domain,Description/Malware Family
+                    # Exemplo: "example.com","C2 for Malware XYZ"
+                    parts = line.split(',')
+                    if len(parts) < 2:
+                        continue
+
+                    domain = parts[0].strip('"').strip()
+                    description = parts[1].strip('"').strip() if len(parts) > 1 else ""
+
+                    ioc = {
+                        "type": "domain",
+                        "subtype": "domain",
+                        "value": domain,
+                        "context": f"Bambenek DGA: {description}" if description else "Bambenek DGA: Algorithm-generated domain",
+                        "tags": ["dga", "c2", "bambenek"],
+                        "malware_family": description if description else None,
+                        "threat_actor": None,
+                        "tlp": "white",
+                        "first_seen": None,
+                        "to_ids": True,
+                    }
+                    iocs.append(ioc)
+
+                except Exception as e:
+                    logger.debug(f"Error parsing Bambenek line: {e}")
+                    continue
+
+            logger.info(f"✅ Extracted {len(iocs)} DGA domains from Bambenek")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching Bambenek DGA feed: {e}")
+            return []
+
+    def fetch_emerging_threats_feed(self, limit: int = 10000) -> List[Dict]:
+        """
+        Importa IPs comprometidos do ProofPoint Emerging Threats
+
+        Args:
+            limit: Número máximo de IPs para processar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching Emerging Threats compromised IPs (limit={limit})...")
+
+        try:
+            url = self.FEEDS["emerging_threats"]["url"]
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            iocs = []
+            lines = response.text.strip().split('\n')
+
+            for line in lines[:limit]:
+                ip = line.strip()
+                if not ip or ip.startswith('#'):
+                    continue
+
+                ioc = {
+                    "type": "ip",
+                    "subtype": "ip-src",
+                    "value": ip,
+                    "context": "Emerging Threats: Compromised IP (bot/proxy/C2)",
+                    "tags": ["compromised", "emerging_threats", "proofpoint"],
+                    "malware_family": None,
+                    "threat_actor": None,
+                    "tlp": "white",
+                    "first_seen": None,
+                    "to_ids": True,
+                }
+                iocs.append(ioc)
+
+            logger.info(f"✅ Extracted {len(iocs)} compromised IPs from Emerging Threats")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching Emerging Threats feed: {e}")
+            return []
+
+    def fetch_alienvault_reputation_feed(self, limit: int = 10000) -> List[Dict]:
+        """
+        Importa IPs de reputação do AlienVault
+
+        O formato é: IP # Description Country,City,Latitude,Longitude
+        Exemplo: 49.143.32.6 # Malicious Host KR,,37.5111999512,126.974098206
+
+        Args:
+            limit: Número máximo de IPs para processar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching AlienVault IP Reputation feed (limit={limit})...")
+
+        try:
+            url = self.FEEDS["alienvault_reputation"]["url"]
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            iocs = []
+            lines = response.text.strip().split('\n')
+
+            for line in lines[:limit]:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+
+                try:
+                    # Parse format: IP # Description Country,City,Lat,Lon
+                    # Exemplo: 49.143.32.6 # Malicious Host KR,,37.5111999512,126.974098206
+                    parts = line.split('#', 1)  # Split apenas no primeiro #
+
+                    if len(parts) < 2:
+                        continue
+
+                    ip = parts[0].strip()
+                    description_part = parts[1].strip()
+
+                    # Extrair descrição e country
+                    # Formato: "Malicious Host KR,,37.5111999512,126.974098206"
+                    # Ou: "Malicious Host US,Ashburn,39.048,-77.472"
+                    # Split no último espaço para separar descrição da localização
+                    space_idx = description_part.rfind(' ')
+                    if space_idx > 0:
+                        description = description_part[:space_idx]
+                        location = description_part[space_idx+1:]
+
+                        # Country code é a primeira parte antes da vírgula
+                        country = location.split(',')[0] if ',' in location else ""
+                    else:
+                        description = description_part
+                        country = ""
+
+                    # Build tags
+                    tags = ["alienvault", "ip_reputation", "malicious_host"]
+                    if country:
+                        tags.append(f"country:{country.lower()}")
+
+                    ioc = {
+                        "type": "ip",
+                        "subtype": "ip-src",
+                        "value": ip,
+                        "context": f"AlienVault Reputation: {description} ({country})",
+                        "tags": tags,
+                        "malware_family": None,
+                        "threat_actor": None,
+                        "tlp": "white",
+                        "first_seen": None,
+                        "confidence": "high",
+                        "to_ids": True,
+                        # Extra metadata
+                        "country": country,
+                    }
+                    iocs.append(ioc)
+
+                except Exception as e:
+                    logger.debug(f"Error parsing AlienVault line: {e}")
+                    continue
+
+            logger.info(f"✅ Extracted {len(iocs)} IPs from AlienVault Reputation")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching AlienVault Reputation feed: {e}")
             return []
 
     def _normalize_otx_type(self, otx_type: str) -> str:

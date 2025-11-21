@@ -243,6 +243,16 @@ async def test_specific_feed(
         iocs = service.fetch_threatfox_feed(limit=limit)
     elif feed_type == "otx":
         iocs = service.fetch_otx_feed(api_key=otx_api_key, limit=limit)
+    elif feed_type == "openphish":
+        iocs = service.fetch_openphish_feed(limit=limit)
+    elif feed_type == "serpro":
+        iocs = service.fetch_serpro_feed(limit=limit)
+    elif feed_type == "bambenek_dga":
+        iocs = service.fetch_bambenek_dga_feed(limit=limit)
+    elif feed_type == "emerging_threats":
+        iocs = service.fetch_emerging_threats_feed(limit=limit)
+    elif feed_type == "alienvault_reputation":
+        iocs = service.fetch_alienvault_reputation_feed(limit=limit)
     else:
         raise HTTPException(status_code=400, detail=f"Feed type '{feed_type}' not implemented yet")
 
@@ -315,6 +325,16 @@ async def sync_specific_feed(
         iocs = service.fetch_threatfox_feed(limit=limit)
     elif feed_type == "otx":
         iocs = service.fetch_otx_feed(api_key=otx_api_key, limit=limit)
+    elif feed_type == "openphish":
+        iocs = service.fetch_openphish_feed(limit=limit)
+    elif feed_type == "serpro":
+        iocs = service.fetch_serpro_feed(limit=limit)
+    elif feed_type == "bambenek_dga":
+        iocs = service.fetch_bambenek_dga_feed(limit=limit)
+    elif feed_type == "emerging_threats":
+        iocs = service.fetch_emerging_threats_feed(limit=limit)
+    elif feed_type == "alienvault_reputation":
+        iocs = service.fetch_alienvault_reputation_feed(limit=limit)
     else:
         raise HTTPException(status_code=400, detail=f"Feed type '{feed_type}' not implemented yet")
 
