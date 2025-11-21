@@ -371,74 +371,178 @@ class MISPFeedService:
         }
         return type_mapping.get(threatfox_type, "other")
 
-    def fetch_otx_feed(self, api_key: str, limit: int = 50) -> List[Dict]:
+    def fetch_otx_feed(self, api_key: str, limit: int = 50, use_pagination: bool = False) -> List[Dict]:
         """
-        Importa IOCs do AlienVault OTX
+        Importa IOCs do AlienVault OTX com enrichment completo
+
+        Baseado no script alien_to_misp_lab.py, extrai:
+        - Adversary (threat actor)
+        - Malware families
+        - Industries (setores alvos)
+        - Attack IDs (MITRE ATT&CK techniques)
+        - References (URLs de referência)
+        - Targeted countries (países alvos)
 
         Args:
             api_key: OTX API key
             limit: Número máximo de pulses para processar
+            use_pagination: Se True, usa paginação (mais lento mas completo)
 
         Returns:
-            Lista de IOCs extraídos
+            Lista de IOCs extraídos com metadados ricos
         """
-        logger.info(f"📡 Fetching AlienVault OTX feed (limit={limit})...")
+        logger.info(f"📡 Fetching AlienVault OTX feed (limit={limit}, pagination={use_pagination})...")
 
         try:
             from OTXv2 import OTXv2, IndicatorTypes
 
             otx = OTXv2(api_key)
             iocs = []
+            pulses_processed = 0
 
-            # Get subscribed pulses
-            pulses = otx.getall()
+            if use_pagination:
+                # Paginação (como alien_to_misp_lab.py)
+                page = 1
+                max_pages = (limit // 10) + 1  # OTX retorna ~10 pulses por página
 
-            for pulse in pulses[:limit]:
-                try:
-                    pulse_name = pulse.get("name", "")
-                    pulse_tags = pulse.get("tags", [])
-                    pulse_tlp = pulse.get("TLP", "white").lower()
+                while pulses_processed < limit and page <= max_pages:
+                    try:
+                        logger.debug(f"Fetching OTX page {page}...")
+                        pulses_data = otx.getall(page=page)
 
-                    # Extract indicators from pulse
-                    for indicator in pulse.get("indicators", []):
-                        ioc_type = indicator.get("type", "")
-                        ioc_value = indicator.get("indicator", "")
+                        if not pulses_data or 'results' not in pulses_data:
+                            break
 
-                        if not ioc_value:
-                            continue
+                        pulses = pulses_data.get('results', [])
+                        if not pulses:
+                            break
 
-                        # Normalizar tipo OTX
-                        normalized_type = self._normalize_otx_type(ioc_type)
+                        for pulse in pulses:
+                            if pulses_processed >= limit:
+                                break
 
-                        ioc = {
-                            "type": normalized_type,
-                            "subtype": ioc_type,
-                            "value": ioc_value,
-                            "context": f"OTX Pulse: {pulse_name}",
-                            "tags": pulse_tags,
-                            "malware_family": None,  # Pode extrair de tags
-                            "threat_actor": None,  # Pode extrair de tags
-                            "tlp": pulse_tlp,
-                            "first_seen": None,
-                            "confidence": "medium",
-                            "to_ids": True,
-                        }
+                            iocs.extend(self._process_otx_pulse(pulse))
+                            pulses_processed += 1
 
-                        # Extrair metadata de tags
-                        ioc.update(self._extract_metadata_from_tags(pulse_tags))
+                        page += 1
 
-                        iocs.append(ioc)
+                    except Exception as e:
+                        logger.warning(f"Error fetching OTX page {page}: {e}")
+                        break
 
-                except Exception as e:
-                    logger.debug(f"Error processing OTX pulse: {e}")
-                    continue
+            else:
+                # Modo simples (sem paginação)
+                pulses = otx.getall()
 
-            logger.info(f"✅ Extracted {len(iocs)} IOCs from OTX")
+                for pulse in pulses[:limit]:
+                    try:
+                        iocs.extend(self._process_otx_pulse(pulse))
+                        pulses_processed += 1
+
+                    except Exception as e:
+                        logger.debug(f"Error processing OTX pulse: {e}")
+                        continue
+
+            logger.info(f"✅ Extracted {len(iocs)} IOCs from {pulses_processed} OTX pulses")
             return iocs
 
         except Exception as e:
             logger.error(f"❌ Error fetching OTX feed: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
             return []
+
+    def _process_otx_pulse(self, pulse: Dict) -> List[Dict]:
+        """
+        Processa um pulse OTX e extrai IOCs com enrichment completo
+
+        Args:
+            pulse: Pulse OTX
+
+        Returns:
+            Lista de IOCs extraídos do pulse
+        """
+        iocs = []
+
+        try:
+            # Extrair metadados do pulse
+            pulse_name = pulse.get("name", "")
+            pulse_description = pulse.get("description", "")
+            pulse_tags = pulse.get("tags", [])
+            pulse_tlp = pulse.get("TLP", "white").lower()
+            pulse_created = pulse.get("created", "")
+
+            # NOVO: Extrair campos de enrichment
+            adversary = pulse.get("adversary", "")  # Threat actor
+            malware_families = pulse.get("malware_families", [])
+            industries = pulse.get("industries", [])
+            attack_ids = pulse.get("attack_ids", [])  # MITRE ATT&CK!
+            references = pulse.get("references", [])
+            targeted_countries = pulse.get("targeted_countries", [])
+
+            # Extract indicators from pulse
+            for indicator in pulse.get("indicators", []):
+                ioc_type = indicator.get("type", "")
+                ioc_value = indicator.get("indicator", "")
+
+                if not ioc_value:
+                    continue
+
+                # Normalizar tipo OTX
+                normalized_type = self._normalize_otx_type(ioc_type)
+
+                # Build tags (incluindo malware families, industries)
+                tags = list(pulse_tags)  # Copy original tags
+
+                # Add malware family tags
+                for malware in malware_families:
+                    tags.append(f"malware_family:{malware}")
+
+                # Add industry tags
+                for industry in industries:
+                    tags.append(f"industry:{industry}")
+
+                # Add ATT&CK tags
+                for attack_id in attack_ids:
+                    tags.append(attack_id)  # Ex: "T1566.001"
+
+                # Add country tags
+                for country in targeted_countries:
+                    tags.append(f"targeted_country:{country}")
+
+                # Add adversary tag
+                if adversary:
+                    tags.append(f"adversary:{adversary}")
+
+                # Build IOC with enriched metadata
+                ioc = {
+                    "type": normalized_type,
+                    "subtype": ioc_type,
+                    "value": ioc_value,
+                    "context": f"OTX Pulse: {pulse_name}",
+                    "tags": tags,
+                    "malware_family": malware_families[0] if malware_families else None,
+                    "threat_actor": adversary if adversary else None,
+                    "tlp": pulse_tlp,
+                    "first_seen": pulse_created if pulse_created else None,
+                    "confidence": "medium",
+                    "to_ids": True,
+                    # Extra enrichment fields
+                    "industries": industries,
+                    "attack_ids": attack_ids,  # MITRE ATT&CK techniques!
+                    "references": references,
+                    "targeted_countries": targeted_countries,
+                }
+
+                # Extrair metadata adicional de tags (método existente)
+                ioc.update(self._extract_metadata_from_tags(pulse_tags))
+
+                iocs.append(ioc)
+
+        except Exception as e:
+            logger.debug(f"Error processing OTX pulse: {e}")
+
+        return iocs
 
     def fetch_openphish_feed(self, limit: int = 1000) -> List[Dict]:
         """

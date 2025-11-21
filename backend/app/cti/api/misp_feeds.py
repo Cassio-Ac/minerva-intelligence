@@ -207,6 +207,7 @@ async def test_specific_feed(
     feed_type: str,
     limit: int = Query(default=5, ge=1, le=50, description="Number of events/items to process"),
     otx_api_key: Optional[str] = Query(None, description="OTX API key (required for OTX feed)"),
+    use_pagination: bool = Query(default=False, description="Use pagination for OTX (slower but more complete)"),
     current_user: dict = Depends(get_current_user),
 ):
     """
@@ -242,7 +243,7 @@ async def test_specific_feed(
     elif feed_type == "threatfox":
         iocs = service.fetch_threatfox_feed(limit=limit)
     elif feed_type == "otx":
-        iocs = service.fetch_otx_feed(api_key=otx_api_key, limit=limit)
+        iocs = service.fetch_otx_feed(api_key=otx_api_key, limit=limit, use_pagination=use_pagination)
     elif feed_type == "openphish":
         iocs = service.fetch_openphish_feed(limit=limit)
     elif feed_type == "serpro":
@@ -324,7 +325,7 @@ async def sync_specific_feed(
     elif feed_type == "threatfox":
         iocs = service.fetch_threatfox_feed(limit=limit)
     elif feed_type == "otx":
-        iocs = service.fetch_otx_feed(api_key=otx_api_key, limit=limit)
+        iocs = service.fetch_otx_feed(api_key=otx_api_key, limit=limit, use_pagination=use_pagination)
     elif feed_type == "openphish":
         iocs = service.fetch_openphish_feed(limit=limit)
     elif feed_type == "serpro":
