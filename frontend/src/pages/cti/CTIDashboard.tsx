@@ -10,7 +10,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Target, AlertCircle, Loader2 } from 'lucide-react';
+import { Target, AlertCircle, Loader2, Shield, Brain, Database } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useSettingsStore } from '@stores/settingsStore';
 import ActorsList from '../../components/cti/ActorsList';
 import AttackMatrix from '../../components/cti/AttackMatrix';
@@ -19,6 +20,7 @@ import { ctiService } from '../../services/cti/ctiService';
 
 const CTIDashboard: React.FC = () => {
   const { currentColors } = useSettingsStore();
+  const navigate = useNavigate();
 
   // View state: 'none' | 'details' | 'matrix'
   const [rightPanelView, setRightPanelView] = useState<'none' | 'details' | 'matrix'>('none');
@@ -82,6 +84,65 @@ const CTIDashboard: React.FC = () => {
         <p className="text-sm" style={{ color: currentColors.text.secondary }}>
           Monitor threat actors and MITRE ATT&CK techniques. Click on an actor to see details.
         </p>
+
+        {/* Navigation Cards */}
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* MISP Feeds Card */}
+          <button
+            onClick={() => navigate('/cti/feeds')}
+            className="p-4 rounded-lg border-2 text-left hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.primary,
+              borderColor: currentColors.border.default,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = currentColors.accent.primary;
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = currentColors.border.default;
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <Shield size={24} style={{ color: currentColors.accent.primary }} />
+              <h3 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+                MISP Feeds
+              </h3>
+            </div>
+            <p className="text-sm" style={{ color: currentColors.text.secondary }}>
+              Teste e visualize feeds públicos de threat intelligence (IOCs). 15 feeds disponíveis incluindo DiamondFox, SSL Blacklist, OpenPhish.
+            </p>
+          </button>
+
+          {/* IOC Enrichment Card */}
+          <button
+            onClick={() => navigate('/cti/enrichment')}
+            className="p-4 rounded-lg border-2 text-left hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.primary,
+              borderColor: currentColors.border.default,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = currentColors.accent.secondary;
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = currentColors.border.default;
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <Brain size={24} style={{ color: currentColors.accent.secondary }} />
+              <h3 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+                IOC Enrichment
+              </h3>
+            </div>
+            <p className="text-sm" style={{ color: currentColors.text.secondary }}>
+              Enriqueça IOCs com LLM e threat intelligence. MITRE ATT&CK mapping, detection methods, e análise contextual.
+            </p>
+          </button>
+        </div>
 
         {/* Stats Summary */}
         {stats && (
