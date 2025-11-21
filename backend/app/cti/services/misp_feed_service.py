@@ -21,8 +21,44 @@ logger = logging.getLogger(__name__)
 class MISPFeedService:
     """Service para consumir feeds MISP públicos"""
 
-    # Feed público do CIRCL (sem autenticação necessária)
-    CIRCL_FEED = "https://www.circl.lu/doc/misp/feed-osint/"
+    # Feeds públicos disponíveis
+    FEEDS = {
+        "circl_osint": {
+            "name": "CIRCL OSINT Feed",
+            "url": "https://www.circl.lu/doc/misp/feed-osint/",
+            "type": "misp",
+            "description": "CIRCL OSINT feed with ~500 IOCs/day",
+            "requires_auth": False,
+        },
+        "urlhaus": {
+            "name": "URLhaus",
+            "url": "https://urlhaus.abuse.ch/downloads/csv_recent/",
+            "type": "csv",
+            "description": "Malicious URLs from URLhaus (~1000/day)",
+            "requires_auth": False,
+        },
+        "botvrij": {
+            "name": "Botvrij.eu",
+            "url": "https://www.botvrij.eu/data/feed-osint/",
+            "type": "misp",
+            "description": "Dutch botnet feed (~200 IOCs/day)",
+            "requires_auth": False,
+        },
+        "threatfox": {
+            "name": "ThreatFox",
+            "url": "https://threatfox.abuse.ch/export/csv/recent/",
+            "type": "csv",
+            "description": "IOCs from ThreatFox",
+            "requires_auth": False,
+        },
+        "otx": {
+            "name": "AlienVault OTX",
+            "url": "https://otx.alienvault.com/api/v1/pulses/subscribed",
+            "type": "otx",
+            "description": "AlienVault OTX pulses (~2000 IOCs/day)",
+            "requires_auth": True,  # Requires API key
+        },
+    }
 
     def __init__(self, db: Optional[AsyncSession] = None, es: Optional[AsyncElasticsearch] = None):
         self.db = db
@@ -162,6 +198,225 @@ class MISPFeedService:
                 metadata["threat_actor"] = tag.split(":")[-1].strip()
 
         return metadata
+
+    def fetch_urlhaus_feed(self, limit: int = 100) -> List[Dict]:
+        """
+        Importa IOCs do URLhaus (CSV format)
+
+        Args:
+            limit: Número máximo de IOCs para importar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching URLhaus feed (limit={limit})...")
+
+        try:
+            url = self.FEEDS["urlhaus"]["url"]
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            iocs = []
+            lines = response.text.strip().split('\n')
+
+            # Skip header lines (começam com #)
+            data_lines = [line for line in lines if not line.startswith('#')][:limit]
+
+            for line in data_lines:
+                try:
+                    # CSV format: id,dateadded,url,url_status,threat,tags,urlhaus_link,reporter
+                    parts = line.split(',')
+                    if len(parts) < 7:
+                        continue
+
+                    url_value = parts[2].strip('"')
+                    threat = parts[4].strip('"') if len(parts) > 4 else ""
+                    tags = parts[5].strip('"').split() if len(parts) > 5 else []
+
+                    ioc = {
+                        "type": "url",
+                        "subtype": "url",
+                        "value": url_value,
+                        "context": f"URLhaus: {threat}" if threat else "URLhaus malicious URL",
+                        "tags": tags,
+                        "malware_family": threat if threat else None,
+                        "threat_actor": None,
+                        "tlp": "white",
+                        "first_seen": None,
+                        "to_ids": True,
+                    }
+                    iocs.append(ioc)
+                except Exception as e:
+                    logger.debug(f"Error parsing URLhaus line: {e}")
+                    continue
+
+            logger.info(f"✅ Extracted {len(iocs)} IOCs from URLhaus")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching URLhaus feed: {e}")
+            return []
+
+    def fetch_threatfox_feed(self, limit: int = 100) -> List[Dict]:
+        """
+        Importa IOCs do ThreatFox (CSV format)
+
+        Args:
+            limit: Número máximo de IOCs para importar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching ThreatFox feed (limit={limit})...")
+
+        try:
+            url = self.FEEDS["threatfox"]["url"]
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            iocs = []
+            lines = response.text.strip().split('\n')
+
+            # Skip header lines
+            data_lines = [line for line in lines if not line.startswith('#')][:limit]
+
+            for line in data_lines:
+                try:
+                    # CSV format: first_seen,ioc_id,ioc_value,ioc_type,threat_type,malware,malware_printable,confidence_level,reporter,reference,tags
+                    parts = line.split(',')
+                    if len(parts) < 7:
+                        continue
+
+                    first_seen_str = parts[0].strip('"')
+                    ioc_value = parts[2].strip('"')
+                    ioc_type = parts[3].strip('"')
+                    threat_type = parts[4].strip('"')
+                    malware = parts[6].strip('"') if len(parts) > 6 else ""
+                    confidence = parts[7].strip('"') if len(parts) > 7 else "medium"
+                    tags = parts[10].strip('"').split() if len(parts) > 10 else []
+
+                    # Normalizar tipo
+                    normalized_type = self._normalize_threatfox_type(ioc_type)
+
+                    ioc = {
+                        "type": normalized_type,
+                        "subtype": ioc_type,
+                        "value": ioc_value,
+                        "context": f"ThreatFox: {threat_type}",
+                        "tags": tags,
+                        "malware_family": malware if malware else None,
+                        "threat_actor": None,
+                        "tlp": "white",
+                        "first_seen": self._parse_date(first_seen_str),
+                        "confidence": confidence.lower() if confidence else "medium",
+                        "to_ids": True,
+                    }
+                    iocs.append(ioc)
+                except Exception as e:
+                    logger.debug(f"Error parsing ThreatFox line: {e}")
+                    continue
+
+            logger.info(f"✅ Extracted {len(iocs)} IOCs from ThreatFox")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching ThreatFox feed: {e}")
+            return []
+
+    def _normalize_threatfox_type(self, threatfox_type: str) -> str:
+        """Normalizar tipo ThreatFox para nosso formato"""
+        type_mapping = {
+            "ip:port": "ip",
+            "domain": "domain",
+            "url": "url",
+            "md5_hash": "hash",
+            "sha256_hash": "hash",
+        }
+        return type_mapping.get(threatfox_type, "other")
+
+    def fetch_otx_feed(self, api_key: str, limit: int = 50) -> List[Dict]:
+        """
+        Importa IOCs do AlienVault OTX
+
+        Args:
+            api_key: OTX API key
+            limit: Número máximo de pulses para processar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching AlienVault OTX feed (limit={limit})...")
+
+        try:
+            from OTXv2 import OTXv2, IndicatorTypes
+
+            otx = OTXv2(api_key)
+            iocs = []
+
+            # Get subscribed pulses
+            pulses = otx.getall()
+
+            for pulse in pulses[:limit]:
+                try:
+                    pulse_name = pulse.get("name", "")
+                    pulse_tags = pulse.get("tags", [])
+                    pulse_tlp = pulse.get("TLP", "white").lower()
+
+                    # Extract indicators from pulse
+                    for indicator in pulse.get("indicators", []):
+                        ioc_type = indicator.get("type", "")
+                        ioc_value = indicator.get("indicator", "")
+
+                        if not ioc_value:
+                            continue
+
+                        # Normalizar tipo OTX
+                        normalized_type = self._normalize_otx_type(ioc_type)
+
+                        ioc = {
+                            "type": normalized_type,
+                            "subtype": ioc_type,
+                            "value": ioc_value,
+                            "context": f"OTX Pulse: {pulse_name}",
+                            "tags": pulse_tags,
+                            "malware_family": None,  # Pode extrair de tags
+                            "threat_actor": None,  # Pode extrair de tags
+                            "tlp": pulse_tlp,
+                            "first_seen": None,
+                            "confidence": "medium",
+                            "to_ids": True,
+                        }
+
+                        # Extrair metadata de tags
+                        ioc.update(self._extract_metadata_from_tags(pulse_tags))
+
+                        iocs.append(ioc)
+
+                except Exception as e:
+                    logger.debug(f"Error processing OTX pulse: {e}")
+                    continue
+
+            logger.info(f"✅ Extracted {len(iocs)} IOCs from OTX")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching OTX feed: {e}")
+            return []
+
+    def _normalize_otx_type(self, otx_type: str) -> str:
+        """Normalizar tipo OTX para nosso formato"""
+        type_mapping = {
+            "IPv4": "ip",
+            "IPv6": "ip",
+            "domain": "domain",
+            "hostname": "domain",
+            "URL": "url",
+            "FileHash-MD5": "hash",
+            "FileHash-SHA1": "hash",
+            "FileHash-SHA256": "hash",
+            "email": "email",
+        }
+        return type_mapping.get(otx_type, "other")
 
     async def import_iocs(
         self, iocs: List[Dict], feed_id: str, index_to_es: bool = False

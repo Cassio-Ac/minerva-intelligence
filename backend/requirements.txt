@@ -69,6 +69,7 @@ kaleido==0.2.1
 mitreattack-python==3.0.3
 stix2==3.0.1
 pymisp>=2.5.17
+OTXv2>=1.5.12
 
 # Testing
 pytest==7.4.3

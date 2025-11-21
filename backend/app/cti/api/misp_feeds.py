@@ -179,3 +179,157 @@ async def get_ioc_stats(
     service = MISPFeedService(db)
     stats = await service.get_ioc_stats()
     return stats
+
+
+@router.get("/feeds/available", summary="List available public feeds")
+async def list_available_feeds(
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Listar todos os feeds públicos disponíveis
+
+    Retorna lista de feeds que podem ser configurados
+    """
+    service = MISPFeedService()
+    return {
+        "feeds": [
+            {
+                "id": feed_id,
+                **feed_info
+            }
+            for feed_id, feed_info in service.FEEDS.items()
+        ]
+    }
+
+
+@router.post("/feeds/test/{feed_type}", summary="Test specific feed type")
+async def test_specific_feed(
+    feed_type: str,
+    limit: int = Query(default=5, ge=1, le=50, description="Number of events/items to process"),
+    otx_api_key: Optional[str] = Query(None, description="OTX API key (required for OTX feed)"),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Testar feed específico por tipo
+
+    **Tipos disponíveis:**
+    - `circl_osint` - CIRCL OSINT Feed
+    - `urlhaus` - URLhaus malicious URLs
+    - `threatfox` - ThreatFox IOCs
+    - `otx` - AlienVault OTX (requer API key)
+
+    **Teste sem persistência no banco**
+    """
+    service = MISPFeedService(db=None)
+
+    if feed_type not in service.FEEDS:
+        raise HTTPException(status_code=404, detail=f"Feed type '{feed_type}' not found")
+
+    feed_info = service.FEEDS[feed_type]
+
+    # Validar autenticação se necessário
+    if feed_info["requires_auth"] and not otx_api_key:
+        raise HTTPException(status_code=400, detail=f"Feed '{feed_type}' requires authentication (otx_api_key)")
+
+    logger.info(f"🧪 Testing {feed_type} feed (limit={limit})...")
+
+    # Buscar IOCs baseado no tipo
+    iocs = []
+    if feed_type == "circl_osint":
+        iocs = service.fetch_circl_feed(limit=limit)
+    elif feed_type == "urlhaus":
+        iocs = service.fetch_urlhaus_feed(limit=limit)
+    elif feed_type == "threatfox":
+        iocs = service.fetch_threatfox_feed(limit=limit)
+    elif feed_type == "otx":
+        iocs = service.fetch_otx_feed(api_key=otx_api_key, limit=limit)
+    else:
+        raise HTTPException(status_code=400, detail=f"Feed type '{feed_type}' not implemented yet")
+
+    return {
+        "status": "success",
+        "feed_type": feed_type,
+        "feed_name": feed_info["name"],
+        "feed_url": feed_info["url"],
+        "items_processed": limit,
+        "iocs_found": len(iocs),
+        "sample": iocs[:5],  # Mostrar primeiros 5 IOCs
+    }
+
+
+@router.post("/feeds/sync/{feed_type}", summary="Sync specific feed to database")
+async def sync_specific_feed(
+    feed_type: str,
+    limit: int = Query(default=100, ge=1, le=1000, description="Number of items to sync"),
+    otx_api_key: Optional[str] = Query(None, description="OTX API key (required for OTX)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Sincronizar feed específico para o banco de dados
+
+    **Tipos disponíveis:**
+    - `circl_osint` - CIRCL OSINT Feed (~500 IOCs)
+    - `urlhaus` - URLhaus (~1000 IOCs)
+    - `threatfox` - ThreatFox IOCs
+    - `otx` - AlienVault OTX (requer API key, ~2000 IOCs)
+
+    **Requer autenticação admin**
+    """
+    service = MISPFeedService(db)
+
+    if feed_type not in service.FEEDS:
+        raise HTTPException(status_code=404, detail=f"Feed type '{feed_type}' not found")
+
+    feed_info = service.FEEDS[feed_type]
+
+    # Validar autenticação se necessário
+    if feed_info["requires_auth"] and not otx_api_key:
+        raise HTTPException(status_code=400, detail=f"Feed '{feed_type}' requires otx_api_key")
+
+    logger.info(f"🔄 Syncing {feed_type} to database (limit={limit})...")
+
+    # 1. Buscar ou criar feed
+    feed = await service.get_feed_by_name(feed_info["name"])
+
+    if not feed:
+        logger.info(f"📝 Creating {feed_info['name']} feed...")
+        feed = await service.create_feed(
+            {
+                "name": feed_info["name"],
+                "url": feed_info["url"],
+                "feed_type": feed_info["type"],
+                "is_public": True,
+                "is_active": True,
+                "sync_frequency": "daily",
+            }
+        )
+
+    # 2. Fetch IOCs baseado no tipo
+    iocs = []
+    if feed_type == "circl_osint":
+        iocs = service.fetch_circl_feed(limit=limit)
+    elif feed_type == "urlhaus":
+        iocs = service.fetch_urlhaus_feed(limit=limit)
+    elif feed_type == "threatfox":
+        iocs = service.fetch_threatfox_feed(limit=limit)
+    elif feed_type == "otx":
+        iocs = service.fetch_otx_feed(api_key=otx_api_key, limit=limit)
+    else:
+        raise HTTPException(status_code=400, detail=f"Feed type '{feed_type}' not implemented yet")
+
+    if not iocs:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch IOCs from {feed_type}")
+
+    # 3. Import IOCs
+    imported_count = await service.import_iocs(iocs, str(feed.id))
+
+    return {
+        "status": "success",
+        "feed_id": str(feed.id),
+        "feed_name": feed.name,
+        "feed_type": feed_type,
+        "items_processed": limit,
+        "iocs_found": len(iocs),
+        "iocs_imported": imported_count,
+    }
