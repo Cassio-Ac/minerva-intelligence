@@ -5,36 +5,20 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
-  Grid,
-  Button,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  TextField,
-  Alert,
-  CircularProgress,
-  Chip,
-  Card,
-  CardContent,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-} from '@mui/material';
-import {
-  CloudDownload,
-  BugReport,
   Shield,
-  Language,
-  Storage,
-} from '@mui/icons-material';
+  CloudDownload,
+  AlertCircle,
+  Check,
+  Loader2,
+  Globe,
+  Hash,
+  ExternalLink,
+} from 'lucide-react';
+import { useSettingsStore } from '@stores/settingsStore';
 import mispFeedsService, { FeedTestResult, AvailableFeed, MISPIoC } from '../../services/cti/mispFeedsService';
 
 const MISPFeedsPage: React.FC = () => {
+  const { currentColors } = useSettingsStore();
   const [availableFeeds, setAvailableFeeds] = useState<AvailableFeed[]>([]);
   const [selectedFeed, setSelectedFeed] = useState<string>('');
   const [limit, setLimit] = useState<number>(5);
@@ -78,223 +62,244 @@ const MISPFeedsPage: React.FC = () => {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'ip':
-        return <Language fontSize="small" />;
+      case 'domain':
       case 'url':
-        return <Language fontSize="small" />;
+        return <Globe size={16} />;
       case 'hash':
-        return <Storage fontSize="small" />;
+        return <Hash size={16} />;
       default:
-        return <BugReport fontSize="small" />;
+        return <ExternalLink size={16} />;
     }
   };
 
-  const getTypeColor = (type: string): "default" | "primary" | "secondary" | "error" | "info" | "success" | "warning" => {
+  const getTypeColor = (type: string): string => {
     switch (type) {
       case 'ip':
-        return 'primary';
+        return '#3b82f6'; // blue
       case 'url':
-        return 'secondary';
+        return '#8b5cf6'; // purple
       case 'hash':
-        return 'info';
+        return '#06b6d4'; // cyan
       case 'domain':
-        return 'success';
+        return '#10b981'; // green
       default:
-        return 'default';
+        return '#6b7280'; // gray
     }
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Shield /> MISP Threat Intelligence Feeds
-      </Typography>
-      <Typography variant="body2" color="text.secondary" gutterBottom>
-        Teste e visualize feeds públicos de threat intelligence (IOCs)
-      </Typography>
+    <div className="min-h-screen p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <Shield size={32} style={{ color: currentColors.text.primary }} />
+          <h1 className="text-3xl font-semibold" style={{ color: currentColors.text.primary }}>
+            MISP Threat Intelligence Feeds
+          </h1>
+        </div>
+        <p className="text-sm" style={{ color: currentColors.text.secondary }}>
+          Teste e visualize feeds públicos de threat intelligence (IOCs)
+        </p>
+      </div>
 
-      <Paper sx={{ p: 3, mt: 3 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={5}>
-            <FormControl fullWidth>
-              <InputLabel>Selecione um Feed</InputLabel>
-              <Select
-                value={selectedFeed}
-                onChange={(e) => setSelectedFeed(e.target.value)}
-                label="Selecione um Feed"
-              >
-                {availableFeeds.map((feed) => (
-                  <MenuItem key={feed.id} value={feed.id}>
-                    {feed.name} ({feed.type})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
+      {/* Controls */}
+      <div className="p-6 rounded-lg mb-6" style={{ backgroundColor: currentColors.bg.primary }}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-sm mb-2" style={{ color: currentColors.text.secondary }}>
+              Selecione um Feed
+            </label>
+            <select
+              value={selectedFeed}
+              onChange={(e) => setSelectedFeed(e.target.value)}
+              className="w-full p-2 rounded border"
+              style={{
+                backgroundColor: currentColors.bg.secondary,
+                color: currentColors.text.primary,
+                borderColor: currentColors.border.primary,
+              }}
+            >
+              <option value="">-- Selecione --</option>
+              {availableFeeds.map((feed) => (
+                <option key={feed.id} value={feed.id}>
+                  {feed.name} ({feed.type})
+                </option>
+              ))}
+            </select>
+            {selectedFeed && (
+              <p className="text-xs mt-2" style={{ color: currentColors.text.secondary }}>
+                {availableFeeds.find(f => f.id === selectedFeed)?.description}
+              </p>
+            )}
+          </div>
 
-          <Grid item xs={12} md={3}>
-            <TextField
-              fullWidth
+          <div>
+            <label className="block text-sm mb-2" style={{ color: currentColors.text.secondary }}>
+              Limite de IOCs
+            </label>
+            <input
               type="number"
-              label="Limite de IOCs"
               value={limit}
               onChange={(e) => setLimit(parseInt(e.target.value) || 5)}
-              inputProps={{ min: 1, max: 50 }}
+              min="1"
+              max="50"
+              className="w-full p-2 rounded border"
+              style={{
+                backgroundColor: currentColors.bg.secondary,
+                color: currentColors.text.primary,
+                borderColor: currentColors.border.primary,
+              }}
             />
-          </Grid>
+          </div>
+        </div>
 
-          <Grid item xs={12} md={4}>
-            <Button
-              fullWidth
-              variant="contained"
-              onClick={handleTestFeed}
-              disabled={loading || !selectedFeed}
-              startIcon={loading ? <CircularProgress size={20} /> : <CloudDownload />}
-            >
-              {loading ? 'Testando...' : 'Testar Feed'}
-            </Button>
-          </Grid>
-        </Grid>
+        <button
+          onClick={handleTestFeed}
+          disabled={loading || !selectedFeed}
+          className="mt-4 px-6 py-2 rounded flex items-center gap-2 disabled:opacity-50"
+          style={{
+            backgroundColor: currentColors.button.primary,
+            color: '#fff',
+          }}
+        >
+          {loading ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              Testando...
+            </>
+          ) : (
+            <>
+              <CloudDownload size={16} />
+              Testar Feed
+            </>
+          )}
+        </button>
+      </div>
 
-        {selectedFeed && (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              {availableFeeds.find(f => f.id === selectedFeed)?.description}
-            </Typography>
-          </Box>
-        )}
-      </Paper>
-
+      {/* Error */}
       {error && (
-        <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <div className="p-4 rounded-lg mb-6 flex items-start gap-3" style={{ backgroundColor: '#fee2e2' }}>
+          <AlertCircle size={20} color="#dc2626" />
+          <div className="flex-1">
+            <p className="text-sm" style={{ color: '#991b1b' }}>{error}</p>
+          </div>
+          <button onClick={() => setError(null)} className="text-sm" style={{ color: '#991b1b' }}>
+            ×
+          </button>
+        </div>
       )}
 
+      {/* Results */}
       {testResult && (
-        <Paper sx={{ p: 3, mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
+        <div className="p-6 rounded-lg" style={{ backgroundColor: currentColors.bg.primary }}>
+          <h2 className="text-xl font-semibold mb-4" style={{ color: currentColors.text.primary }}>
             Resultado do Teste
-          </Typography>
+          </h2>
 
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={3}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Feed
-                  </Typography>
-                  <Typography variant="h6">{testResult.feed_name}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Itens Processados
-                  </Typography>
-                  <Typography variant="h6">{testResult.items_processed}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    IOCs Encontrados
-                  </Typography>
-                  <Typography variant="h6" color="success.main">
-                    {testResult.iocs_found}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Status
-                  </Typography>
-                  <Chip
-                    label={testResult.status}
-                    color="success"
-                    size="small"
-                  />
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+              <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>Feed</p>
+              <p className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+                {testResult.feed_name}
+              </p>
+            </div>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+              <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>Itens Processados</p>
+              <p className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+                {testResult.items_processed}
+              </p>
+            </div>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+              <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>IOCs Encontrados</p>
+              <p className="text-lg font-semibold" style={{ color: '#10b981' }}>
+                {testResult.iocs_found}
+              </p>
+            </div>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+              <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>Status</p>
+              <div className="flex items-center gap-2">
+                <Check size={16} color="#10b981" />
+                <span className="text-sm" style={{ color: '#10b981' }}>{testResult.status}</span>
+              </div>
+            </div>
+          </div>
 
-          <Divider sx={{ my: 2 }} />
+          <div className="border-t pt-4 mb-4" style={{ borderColor: currentColors.border.primary }}></div>
 
-          <Typography variant="h6" gutterBottom>
+          {/* IOC Samples */}
+          <h3 className="text-lg font-semibold mb-3" style={{ color: currentColors.text.primary }}>
             Samples de IOCs
-          </Typography>
+          </h3>
 
-          <List>
+          <div className="space-y-3">
             {testResult.sample.map((ioc: MISPIoC, index: number) => (
-              <ListItem
+              <div
                 key={index}
-                sx={{
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  mb: 1,
+                className="p-4 rounded border"
+                style={{
+                  backgroundColor: currentColors.bg.secondary,
+                  borderColor: currentColors.border.primary,
                 }}
               >
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                      {getTypeIcon(ioc.type)}
-                      <Typography variant="body1" component="span" sx={{ fontFamily: 'monospace' }}>
-                        {ioc.value}
-                      </Typography>
-                      <Chip
-                        label={ioc.type}
-                        size="small"
-                        color={getTypeColor(ioc.type)}
-                      />
+                <div className="flex items-start gap-3 mb-2">
+                  {getTypeIcon(ioc.type)}
+                  <div className="flex-1">
+                    <p className="font-mono text-sm mb-2" style={{ color: currentColors.text.primary }}>
+                      {ioc.value}
+                    </p>
+                    <div className="flex gap-2 flex-wrap mb-2">
+                      <span
+                        className="px-2 py-1 rounded text-xs"
+                        style={{ backgroundColor: getTypeColor(ioc.type), color: '#fff' }}
+                      >
+                        {ioc.type}
+                      </span>
                       {ioc.malware_family && (
-                        <Chip
-                          label={`Malware: ${ioc.malware_family}`}
-                          size="small"
-                          color="error"
-                        />
+                        <span className="px-2 py-1 rounded text-xs" style={{ backgroundColor: '#dc2626', color: '#fff' }}>
+                          Malware: {ioc.malware_family}
+                        </span>
                       )}
                       {ioc.confidence && (
-                        <Chip
-                          label={`Confidence: ${ioc.confidence}`}
-                          size="small"
-                          variant="outlined"
-                        />
+                        <span
+                          className="px-2 py-1 rounded text-xs border"
+                          style={{ borderColor: currentColors.border.primary, color: currentColors.text.secondary }}
+                        >
+                          Confidence: {ioc.confidence}
+                        </span>
                       )}
-                    </Box>
-                  }
-                  secondary={
-                    <Box sx={{ mt: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        {ioc.context}
-                      </Typography>
-                      {ioc.tags && ioc.tags.length > 0 && (
-                        <Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                          {ioc.tags.map((tag, i) => (
-                            <Chip key={i} label={tag} size="small" variant="outlined" />
-                          ))}
-                        </Box>
-                      )}
-                    </Box>
-                  }
-                />
-              </ListItem>
+                    </div>
+                    <p className="text-sm mb-2" style={{ color: currentColors.text.secondary }}>
+                      {ioc.context}
+                    </p>
+                    {ioc.tags && ioc.tags.length > 0 && (
+                      <div className="flex gap-2 flex-wrap">
+                        {ioc.tags.map((tag, i) => (
+                          <span
+                            key={i}
+                            className="px-2 py-1 rounded text-xs border"
+                            style={{
+                              borderColor: currentColors.border.primary,
+                              color: currentColors.text.secondary,
+                            }}
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             ))}
-          </List>
+          </div>
 
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
+          <p className="text-xs mt-4" style={{ color: currentColors.text.secondary }}>
             Feed URL: {testResult.feed_url}
-          </Typography>
-        </Paper>
+          </p>
+        </div>
       )}
-    </Box>
+    </div>
   );
 };
 

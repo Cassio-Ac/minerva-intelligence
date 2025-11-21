@@ -5,53 +5,19 @@
 
 import React, { useState } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
-  Grid,
-  Button,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Alert,
-  CircularProgress,
-  Chip,
-  Card,
-  CardContent,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  Tab,
-  Tabs,
-} from '@mui/material';
-import {
-  Psychology,
-  BugReport,
+  Brain,
   Shield,
+  Loader2,
+  AlertCircle,
+  Check,
+  Target,
   TrendingUp,
-  Security,
-} from '@mui/icons-material';
+} from 'lucide-react';
+import { useSettingsStore } from '@stores/settingsStore';
 import iocEnrichmentService, { EnrichedIOC, EnrichFromFeedResponse } from '../../services/cti/iocEnrichmentService';
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-  return (
-    <div hidden={value !== index} {...other}>
-      {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
-    </div>
-  );
-}
-
 const IOCEnrichmentPage: React.FC = () => {
-  const [tabValue, setTabValue] = useState(0);
+  const { currentColors } = useSettingsStore();
   const [selectedFeed, setSelectedFeed] = useState<string>('');
   const [limit, setLimit] = useState<number>(3);
   const [loading, setLoading] = useState(false);
@@ -95,308 +61,333 @@ const IOCEnrichmentPage: React.FC = () => {
     }
   };
 
-  const getSeverityColor = (severity: string): "default" | "error" | "warning" | "info" | "success" => {
+  const getSeverityColor = (severity: string): string => {
     switch (severity) {
       case 'critical':
-        return 'error';
       case 'high':
-        return 'error';
+        return '#dc2626'; // red
       case 'medium':
-        return 'warning';
+        return '#f59e0b'; // orange
       case 'low':
-        return 'info';
+        return '#3b82f6'; // blue
       default:
-        return 'default';
+        return '#6b7280'; // gray
     }
   };
 
-  const getThreatTypeColor = (threatType: string): "default" | "primary" | "secondary" | "error" | "info" | "success" | "warning" => {
+  const getThreatTypeColor = (threatType: string): string => {
     switch (threatType) {
       case 'c2':
-        return 'error';
-      case 'phishing':
-        return 'warning';
       case 'malware_delivery':
-        return 'error';
       case 'data_exfiltration':
-        return 'error';
+        return '#dc2626'; // red
+      case 'phishing':
+        return '#f59e0b'; // orange
       case 'reconnaissance':
-        return 'info';
+        return '#3b82f6'; // blue
       default:
-        return 'default';
+        return '#6b7280'; // gray
     }
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Psychology /> IOC Enrichment com LLM
-      </Typography>
-      <Typography variant="body2" color="text.secondary" gutterBottom>
-        Enriqueça IOCs com contexto de threat intelligence usando LLM e MITRE ATT&CK
-      </Typography>
+    <div className="min-h-screen p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <Brain size={32} style={{ color: currentColors.text.primary }} />
+          <h1 className="text-3xl font-semibold" style={{ color: currentColors.text.primary }}>
+            IOC Enrichment com LLM
+          </h1>
+        </div>
+        <p className="text-sm" style={{ color: currentColors.text.secondary }}>
+          Enriqueça IOCs com contexto de threat intelligence usando LLM e MITRE ATT&CK
+        </p>
+      </div>
 
-      <Paper sx={{ mt: 3 }}>
-        <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)}>
-          <Tab label="Enriquecer de Feed" icon={<BugReport />} iconPosition="start" />
-        </Tabs>
+      {/* Controls */}
+      <div className="p-6 rounded-lg mb-6" style={{ backgroundColor: currentColors.bg.primary }}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-sm mb-2" style={{ color: currentColors.text.secondary }}>
+              Selecione um Feed para Enriquecer
+            </label>
+            <select
+              value={selectedFeed}
+              onChange={(e) => setSelectedFeed(e.target.value)}
+              className="w-full p-2 rounded border"
+              style={{
+                backgroundColor: currentColors.bg.secondary,
+                color: currentColors.text.primary,
+                borderColor: currentColors.border.primary,
+              }}
+            >
+              <option value="">-- Selecione --</option>
+              {availableFeeds.map((feed) => (
+                <option key={feed.id} value={feed.id}>
+                  {feed.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <TabPanel value={tabValue} index={0}>
-          <Box sx={{ p: 3 }}>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Selecione um Feed</InputLabel>
-                  <Select
-                    value={selectedFeed}
-                    onChange={(e) => setSelectedFeed(e.target.value)}
-                    label="Selecione um Feed"
-                  >
-                    {availableFeeds.map((feed) => (
-                      <MenuItem key={feed.id} value={feed.id}>
-                        {feed.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
+          <div>
+            <label className="block text-sm mb-2" style={{ color: currentColors.text.secondary }}>
+              Limite de IOCs
+            </label>
+            <select
+              value={limit}
+              onChange={(e) => setLimit(Number(e.target.value))}
+              className="w-full p-2 rounded border"
+              style={{
+                backgroundColor: currentColors.bg.secondary,
+                color: currentColors.text.primary,
+                borderColor: currentColors.border.primary,
+              }}
+            >
+              <option value={1}>1 IOC</option>
+              <option value={3}>3 IOCs</option>
+              <option value={5}>5 IOCs</option>
+              <option value={10}>10 IOCs</option>
+            </select>
+          </div>
+        </div>
 
-              <Grid item xs={12} md={3}>
-                <FormControl fullWidth>
-                  <InputLabel>Limite</InputLabel>
-                  <Select
-                    value={limit}
-                    onChange={(e) => setLimit(e.target.value as number)}
-                    label="Limite"
-                  >
-                    <MenuItem value={1}>1 IOC</MenuItem>
-                    <MenuItem value={3}>3 IOCs</MenuItem>
-                    <MenuItem value={5}>5 IOCs</MenuItem>
-                    <MenuItem value={10}>10 IOCs</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
+        <button
+          onClick={handleEnrichFromFeed}
+          disabled={loading || !selectedFeed}
+          className="mt-4 px-6 py-2 rounded flex items-center gap-2 disabled:opacity-50"
+          style={{
+            backgroundColor: currentColors.button.primary,
+            color: '#fff',
+          }}
+        >
+          {loading ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              Enriquecendo...
+            </>
+          ) : (
+            <>
+              <Brain size={16} />
+              Enriquecer
+            </>
+          )}
+        </button>
+      </div>
 
-              <Grid item xs={12} md={3}>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  onClick={handleEnrichFromFeed}
-                  disabled={loading || !selectedFeed}
-                  startIcon={loading ? <CircularProgress size={20} /> : <Psychology />}
-                >
-                  {loading ? 'Enriquecendo...' : 'Enriquecer'}
-                </Button>
-              </Grid>
-            </Grid>
-          </Box>
-        </TabPanel>
-      </Paper>
-
+      {/* Error */}
       {error && (
-        <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <div className="p-4 rounded-lg mb-6 flex items-start gap-3" style={{ backgroundColor: '#fee2e2' }}>
+          <AlertCircle size={20} color="#dc2626" />
+          <div className="flex-1">
+            <p className="text-sm" style={{ color: '#991b1b' }}>{error}</p>
+          </div>
+          <button onClick={() => setError(null)} className="text-sm" style={{ color: '#991b1b' }}>
+            ×
+          </button>
+        </div>
       )}
 
+      {/* Results */}
       {enrichResult && (
-        <Paper sx={{ p: 3, mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
+        <div className="p-6 rounded-lg" style={{ backgroundColor: currentColors.bg.primary }}>
+          <h2 className="text-xl font-semibold mb-4" style={{ color: currentColors.text.primary }}>
             Resultado do Enrichment
-          </Typography>
+          </h2>
 
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={3}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Feed
-                  </Typography>
-                  <Typography variant="h6">{enrichResult.feed_name}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    IOCs Fetched
-                  </Typography>
-                  <Typography variant="h6">{enrichResult.iocs_fetched}</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    IOCs Enriquecidos
-                  </Typography>
-                  <Typography variant="h6" color="success.main">
-                    {enrichResult.iocs_enriched}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Status
-                  </Typography>
-                  <Chip label={enrichResult.status} color="success" size="small" />
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+              <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>Feed</p>
+              <p className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+                {enrichResult.feed_name}
+              </p>
+            </div>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+              <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>IOCs Fetched</p>
+              <p className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+                {enrichResult.iocs_fetched}
+              </p>
+            </div>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+              <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>IOCs Enriquecidos</p>
+              <p className="text-lg font-semibold" style={{ color: '#10b981' }}>
+                {enrichResult.iocs_enriched}
+              </p>
+            </div>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+              <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>Status</p>
+              <div className="flex items-center gap-2">
+                <Check size={16} color="#10b981" />
+                <span className="text-sm" style={{ color: '#10b981' }}>{enrichResult.status}</span>
+              </div>
+            </div>
+          </div>
 
-          <Divider sx={{ my: 2 }} />
+          <div className="border-t pt-4 mb-4" style={{ borderColor: currentColors.border.primary }}></div>
 
-          <Typography variant="h6" gutterBottom>
+          {/* Enriched IOCs */}
+          <h3 className="text-lg font-semibold mb-3" style={{ color: currentColors.text.primary }}>
             IOCs Enriquecidos
-          </Typography>
+          </h3>
 
-          <List>
+          <div className="space-y-4">
             {enrichResult.enriched_iocs.map((enrichedIOC: EnrichedIOC, index: number) => (
-              <ListItem
+              <div
                 key={index}
-                sx={{
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  mb: 2,
-                  flexDirection: 'column',
-                  alignItems: 'stretch',
-                }}
+                className="border rounded-lg overflow-hidden"
+                style={{ borderColor: currentColors.border.primary }}
               >
                 {/* IOC Header */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                  <BugReport fontSize="small" />
-                  <Typography variant="body1" sx={{ fontFamily: 'monospace', flex: 1 }}>
+                <div className="p-4 flex items-center gap-3" style={{ backgroundColor: currentColors.bg.secondary }}>
+                  <Target size={16} />
+                  <p className="font-mono text-sm flex-1" style={{ color: currentColors.text.primary }}>
                     {enrichedIOC.value.substring(0, 80)}
                     {enrichedIOC.value.length > 80 ? '...' : ''}
-                  </Typography>
-                  <Chip label={enrichedIOC.type} size="small" color="primary" />
-                </Box>
+                  </p>
+                  <span
+                    className="px-2 py-1 rounded text-xs"
+                    style={{ backgroundColor: '#3b82f6', color: '#fff' }}
+                  >
+                    {enrichedIOC.type}
+                  </span>
+                </div>
 
                 {/* Enrichment Data */}
-                <Box sx={{ bgcolor: 'background.default', p: 2, borderRadius: 1 }}>
-                  <Grid container spacing={2}>
-                    {/* Threat Type & Severity */}
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="subtitle2" color="text.secondary">
+                <div className="p-4 space-y-4">
+                  {/* Threat Type & Severity */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>
                         Threat Type
-                      </Typography>
-                      <Chip
-                        label={enrichedIOC.enrichment.threat_type}
-                        size="small"
-                        color={getThreatTypeColor(enrichedIOC.enrichment.threat_type)}
-                        sx={{ mt: 0.5 }}
-                      />
-                    </Grid>
-
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="subtitle2" color="text.secondary">
+                      </p>
+                      <span
+                        className="px-2 py-1 rounded text-xs"
+                        style={{ backgroundColor: getThreatTypeColor(enrichedIOC.enrichment.threat_type), color: '#fff' }}
+                      >
+                        {enrichedIOC.enrichment.threat_type}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>
                         Severity
-                      </Typography>
-                      <Chip
-                        icon={<Shield />}
-                        label={enrichedIOC.enrichment.severity.toUpperCase()}
-                        size="small"
-                        color={getSeverityColor(enrichedIOC.enrichment.severity)}
-                        sx={{ mt: 0.5 }}
-                      />
-                    </Grid>
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Shield size={16} color={getSeverityColor(enrichedIOC.enrichment.severity)} />
+                        <span
+                          className="px-2 py-1 rounded text-xs"
+                          style={{ backgroundColor: getSeverityColor(enrichedIOC.enrichment.severity), color: '#fff' }}
+                        >
+                          {enrichedIOC.enrichment.severity.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
-                    {/* Summary */}
-                    <Grid item xs={12}>
-                      <Typography variant="subtitle2" color="text.secondary">
-                        Summary
-                      </Typography>
-                      <Typography variant="body2" sx={{ mt: 0.5 }}>
-                        {enrichedIOC.enrichment.summary}
-                      </Typography>
-                    </Grid>
+                  {/* Summary */}
+                  <div>
+                    <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>
+                      Summary
+                    </p>
+                    <p className="text-sm" style={{ color: currentColors.text.primary }}>
+                      {enrichedIOC.enrichment.summary}
+                    </p>
+                  </div>
 
-                    {/* MITRE ATT&CK Techniques */}
-                    {enrichedIOC.enrichment.techniques && enrichedIOC.enrichment.techniques.length > 0 && (
-                      <Grid item xs={12}>
-                        <Typography variant="subtitle2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Security fontSize="small" /> MITRE ATT&CK Techniques
-                        </Typography>
-                        <Box sx={{ mt: 0.5, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                          {enrichedIOC.enrichment.techniques.map((tech, i) => (
-                            <Chip
-                              key={i}
-                              label={tech}
-                              size="small"
-                              variant="outlined"
-                              color="error"
-                            />
-                          ))}
-                        </Box>
-                      </Grid>
+                  {/* MITRE ATT&CK Techniques */}
+                  {enrichedIOC.enrichment.techniques && enrichedIOC.enrichment.techniques.length > 0 && (
+                    <div>
+                      <p className="text-xs mb-2 flex items-center gap-2" style={{ color: currentColors.text.secondary }}>
+                        <TrendingUp size={14} /> MITRE ATT&CK Techniques
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {enrichedIOC.enrichment.techniques.map((tech, i) => (
+                          <span
+                            key={i}
+                            className="px-2 py-1 rounded text-xs border"
+                            style={{
+                              borderColor: '#dc2626',
+                              color: '#dc2626',
+                            }}
+                          >
+                            {tech}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tactics */}
+                  {enrichedIOC.enrichment.tactics && enrichedIOC.enrichment.tactics.length > 0 && (
+                    <div>
+                      <p className="text-xs mb-2" style={{ color: currentColors.text.secondary }}>
+                        Tactics
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {enrichedIOC.enrichment.tactics.map((tactic, i) => (
+                          <span
+                            key={i}
+                            className="px-2 py-1 rounded text-xs border"
+                            style={{
+                              borderColor: currentColors.border.primary,
+                              color: currentColors.text.secondary,
+                            }}
+                          >
+                            {tactic}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Detection Methods */}
+                  {enrichedIOC.enrichment.detection_methods && enrichedIOC.enrichment.detection_methods.length > 0 && (
+                    <div>
+                      <p className="text-xs mb-2" style={{ color: currentColors.text.secondary }}>
+                        Detection Methods
+                      </p>
+                      <ul className="space-y-1">
+                        {enrichedIOC.enrichment.detection_methods.map((method, i) => (
+                          <li key={i} className="text-sm" style={{ color: currentColors.text.primary }}>
+                            {i + 1}. {method}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Footer */}
+                  <div className="flex gap-2 flex-wrap pt-2 border-t" style={{ borderColor: currentColors.border.primary }}>
+                    <span
+                      className="px-2 py-1 rounded text-xs border"
+                      style={{
+                        borderColor: currentColors.border.primary,
+                        color: currentColors.text.secondary,
+                      }}
+                    >
+                      Confidence: {enrichedIOC.enrichment.confidence}
+                    </span>
+                    {enrichedIOC.enrichment.llm_used && (
+                      <span
+                        className="px-2 py-1 rounded text-xs border flex items-center gap-1"
+                        style={{
+                          borderColor: currentColors.border.primary,
+                          color: currentColors.text.secondary,
+                        }}
+                      >
+                        <Brain size={12} />
+                        {enrichedIOC.enrichment.llm_used}
+                      </span>
                     )}
-
-                    {/* Tactics */}
-                    {enrichedIOC.enrichment.tactics && enrichedIOC.enrichment.tactics.length > 0 && (
-                      <Grid item xs={12}>
-                        <Typography variant="subtitle2" color="text.secondary">
-                          Tactics
-                        </Typography>
-                        <Box sx={{ mt: 0.5, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                          {enrichedIOC.enrichment.tactics.map((tactic, i) => (
-                            <Chip key={i} label={tactic} size="small" variant="outlined" />
-                          ))}
-                        </Box>
-                      </Grid>
-                    )}
-
-                    {/* Detection Methods */}
-                    {enrichedIOC.enrichment.detection_methods && enrichedIOC.enrichment.detection_methods.length > 0 && (
-                      <Grid item xs={12}>
-                        <Typography variant="subtitle2" color="text.secondary">
-                          Detection Methods
-                        </Typography>
-                        <List dense sx={{ mt: 0.5 }}>
-                          {enrichedIOC.enrichment.detection_methods.map((method, i) => (
-                            <ListItem key={i} sx={{ py: 0.5 }}>
-                              <ListItemText
-                                primary={`${i + 1}. ${method}`}
-                                primaryTypographyProps={{ variant: 'body2' }}
-                              />
-                            </ListItem>
-                          ))}
-                        </List>
-                      </Grid>
-                    )}
-
-                    {/* Footer */}
-                    <Grid item xs={12}>
-                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <Chip
-                          label={`Confidence: ${enrichedIOC.enrichment.confidence}`}
-                          size="small"
-                          variant="outlined"
-                        />
-                        {enrichedIOC.enrichment.llm_used && (
-                          <Chip
-                            icon={<Psychology fontSize="small" />}
-                            label={enrichedIOC.enrichment.llm_used}
-                            size="small"
-                            variant="outlined"
-                          />
-                        )}
-                      </Box>
-                    </Grid>
-                  </Grid>
-                </Box>
-              </ListItem>
+                  </div>
+                </div>
+              </div>
             ))}
-          </List>
-        </Paper>
+          </div>
+        </div>
       )}
-    </Box>
+    </div>
   );
 };
 
