@@ -254,6 +254,14 @@ async def test_specific_feed(
         iocs = service.fetch_emerging_threats_feed(limit=limit)
     elif feed_type == "alienvault_reputation":
         iocs = service.fetch_alienvault_reputation_feed(limit=limit)
+    elif feed_type == "sslbl":
+        iocs = service.fetch_sslbl_feed(limit=limit)
+    elif feed_type == "digitalside":
+        iocs = service.fetch_digitalside_feed(limit=limit)
+    elif feed_type == "blocklist_de":
+        iocs = service.fetch_blocklist_de_feed(limit=limit)
+    elif feed_type == "greensnow":
+        iocs = service.fetch_greensnow_feed(limit=limit)
     else:
         raise HTTPException(status_code=400, detail=f"Feed type '{feed_type}' not implemented yet")
 
@@ -336,6 +344,14 @@ async def sync_specific_feed(
         iocs = service.fetch_emerging_threats_feed(limit=limit)
     elif feed_type == "alienvault_reputation":
         iocs = service.fetch_alienvault_reputation_feed(limit=limit)
+    elif feed_type == "sslbl":
+        iocs = service.fetch_sslbl_feed(limit=limit)
+    elif feed_type == "digitalside":
+        iocs = service.fetch_digitalside_feed(limit=limit)
+    elif feed_type == "blocklist_de":
+        iocs = service.fetch_blocklist_de_feed(limit=limit)
+    elif feed_type == "greensnow":
+        iocs = service.fetch_greensnow_feed(limit=limit)
     else:
         raise HTTPException(status_code=400, detail=f"Feed type '{feed_type}' not implemented yet")
 

@@ -94,6 +94,35 @@ class MISPFeedService:
             "description": "IP reputation feed (malware, phishing, C2)",
             "requires_auth": False,
         },
+        # Tier 2 Feeds (High Priority)
+        "sslbl": {
+            "name": "abuse.ch SSL Blacklist",
+            "url": "https://sslbl.abuse.ch/blacklist/sslblacklist.csv",
+            "type": "csv",
+            "description": "SSL certificates associated with malware/C2",
+            "requires_auth": False,
+        },
+        "digitalside": {
+            "name": "DigitalSide Threat-Intel",
+            "url": "https://osint.digitalside.it/Threat-Intel/digitalside-misp-feed/",
+            "type": "misp",
+            "description": "MISP native format feed with comprehensive IOCs",
+            "requires_auth": False,
+        },
+        "blocklist_de": {
+            "name": "blocklist.de All Lists",
+            "url": "https://lists.blocklist.de/lists/all.txt",
+            "type": "txt",
+            "description": "Aggregated blocklist from multiple sources",
+            "requires_auth": False,
+        },
+        "greensnow": {
+            "name": "GreenSnow Blocklist",
+            "url": "https://blocklist.greensnow.co/greensnow.txt",
+            "type": "txt",
+            "description": "GreenSnow malicious IPs blocklist",
+            "requires_auth": False,
+        },
     }
 
     def __init__(self, db: Optional[AsyncSession] = None, es: Optional[AsyncElasticsearch] = None):
@@ -826,6 +855,268 @@ class MISPFeedService:
 
         except Exception as e:
             logger.error(f"❌ Error fetching AlienVault Reputation feed: {e}")
+            return []
+
+    def fetch_sslbl_feed(self, limit: int = 1000) -> List[Dict]:
+        """
+        Importa SSL certificates blacklist do abuse.ch SSL Blacklist
+
+        Feed contém SHA1 fingerprints de certificados SSL associados a malware/C2.
+        Formato CSV: Listingdate,SHA1,Listingreason
+
+        Args:
+            limit: Número máximo de certificados para processar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching abuse.ch SSL Blacklist (limit={limit})...")
+
+        try:
+            url = self.FEEDS["sslbl"]["url"]
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            iocs = []
+            lines = response.text.strip().split('\n')
+
+            # Skip header lines (começam com #)
+            data_lines = [line for line in lines if not line.startswith('#')]
+
+            for line in data_lines[:limit]:
+                line = line.strip()
+                if not line:
+                    continue
+
+                try:
+                    # Parse CSV: Listingdate,SHA1,Listingreason
+                    # Exemplo: 2024-11-20 14:52:17,a1b2c3d4e5f6...,Dridex C&C
+                    parts = line.split(',', 2)
+
+                    if len(parts) < 3:
+                        continue
+
+                    listing_date = parts[0].strip()
+                    sha1 = parts[1].strip()
+                    reason = parts[2].strip()
+
+                    # Extrair malware family do reason (se possível)
+                    malware_family = None
+                    if reason:
+                        # Reason geralmente contém malware name (ex: "Dridex C&C")
+                        malware_family = reason.split()[0] if ' ' in reason else reason
+
+                    ioc = {
+                        "type": "hash",
+                        "subtype": "x509-fingerprint-sha1",
+                        "value": sha1,
+                        "context": f"abuse.ch SSL Blacklist: {reason}",
+                        "tags": ["ssl", "c2", "malware", "sslbl"],
+                        "malware_family": malware_family,
+                        "threat_actor": None,
+                        "tlp": "white",
+                        "first_seen": listing_date if listing_date else None,
+                        "confidence": "high",
+                        "to_ids": True,
+                    }
+                    iocs.append(ioc)
+
+                except Exception as e:
+                    logger.debug(f"Error parsing SSLBL line: {e}")
+                    continue
+
+            logger.info(f"✅ Extracted {len(iocs)} SSL fingerprints from abuse.ch")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching abuse.ch SSL Blacklist: {e}")
+            return []
+
+    def fetch_digitalside_feed(self, limit: int = 100) -> List[Dict]:
+        """
+        Importa IOCs do DigitalSide Threat-Intel feed
+
+        Feed usa formato MISP nativo (manifest + events JSON).
+        Similar ao CIRCL feed.
+
+        Args:
+            limit: Número máximo de eventos para processar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching DigitalSide Threat-Intel feed (limit={limit})...")
+
+        try:
+            base_url = self.FEEDS["digitalside"]["url"]
+            manifest_url = f"{base_url}manifest.json"
+
+            # 1. Fetch manifest
+            logger.debug(f"Fetching manifest from {manifest_url}")
+            response = requests.get(manifest_url, timeout=30)
+            response.raise_for_status()
+            manifest = response.json()
+
+            # Manifest é um dict com {uuid: filename}
+            event_files = list(manifest.values())[:limit]
+            logger.info(f"📋 Found {len(manifest)} events in manifest, processing {len(event_files)}")
+
+            iocs = []
+
+            # 2. Fetch each event
+            for event_file in event_files:
+                try:
+                    event_url = f"{base_url}{event_file}"
+                    logger.debug(f"Fetching event: {event_url}")
+
+                    event_response = requests.get(event_url, timeout=10)
+                    event_response.raise_for_status()
+                    event_data = event_response.json()
+
+                    # Extract event metadata
+                    event = event_data.get("Event", {})
+                    event_info = event.get("info", "Unknown event")
+                    event_date = event.get("date", "")
+
+                    # Extract attributes (IOCs)
+                    attributes = event.get("Attribute", [])
+
+                    for attr in attributes:
+                        attr_type = attr.get("type", "")
+                        attr_value = attr.get("value", "")
+                        attr_category = attr.get("category", "")
+                        to_ids = attr.get("to_ids", False)
+
+                        if not attr_value:
+                            continue
+
+                        # Normalizar tipo
+                        normalized_type = self._normalize_misp_type(attr_type)
+
+                        ioc = {
+                            "type": normalized_type,
+                            "subtype": attr_type,
+                            "value": attr_value,
+                            "context": f"DigitalSide: {event_info}",
+                            "tags": ["digitalside", attr_category.lower() if attr_category else ""],
+                            "malware_family": None,
+                            "threat_actor": None,
+                            "tlp": "white",
+                            "first_seen": event_date if event_date else None,
+                            "confidence": "medium",
+                            "to_ids": to_ids,
+                        }
+                        iocs.append(ioc)
+
+                except Exception as e:
+                    logger.debug(f"Error processing DigitalSide event {event_file}: {e}")
+                    continue
+
+            logger.info(f"✅ Extracted {len(iocs)} IOCs from DigitalSide ({len(event_files)} events)")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching DigitalSide feed: {e}")
+            return []
+
+    def fetch_blocklist_de_feed(self, limit: int = 10000) -> List[Dict]:
+        """
+        Importa IPs do blocklist.de All Lists
+
+        Feed agrega múltiplas fontes de IPs maliciosos.
+        Formato TXT simples (um IP por linha).
+
+        Args:
+            limit: Número máximo de IPs para processar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching blocklist.de All Lists (limit={limit})...")
+
+        try:
+            url = self.FEEDS["blocklist_de"]["url"]
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            iocs = []
+            lines = response.text.strip().split('\n')
+
+            for line in lines[:limit]:
+                ip = line.strip()
+                if not ip or ip.startswith('#'):
+                    continue
+
+                ioc = {
+                    "type": "ip",
+                    "subtype": "ip-src",
+                    "value": ip,
+                    "context": "blocklist.de: Aggregated malicious IP",
+                    "tags": ["blocklist_de", "malicious_ip", "aggregated"],
+                    "malware_family": None,
+                    "threat_actor": None,
+                    "tlp": "white",
+                    "first_seen": None,
+                    "confidence": "medium",
+                    "to_ids": True,
+                }
+                iocs.append(ioc)
+
+            logger.info(f"✅ Extracted {len(iocs)} IPs from blocklist.de")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching blocklist.de feed: {e}")
+            return []
+
+    def fetch_greensnow_feed(self, limit: int = 10000) -> List[Dict]:
+        """
+        Importa IPs do GreenSnow Blocklist
+
+        Feed de IPs maliciosos mantido pela GreenSnow.
+        Formato TXT simples (um IP por linha).
+
+        Args:
+            limit: Número máximo de IPs para processar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching GreenSnow Blocklist (limit={limit})...")
+
+        try:
+            url = self.FEEDS["greensnow"]["url"]
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            iocs = []
+            lines = response.text.strip().split('\n')
+
+            for line in lines[:limit]:
+                ip = line.strip()
+                if not ip or ip.startswith('#'):
+                    continue
+
+                ioc = {
+                    "type": "ip",
+                    "subtype": "ip-src",
+                    "value": ip,
+                    "context": "GreenSnow: Malicious IP",
+                    "tags": ["greensnow", "malicious_ip"],
+                    "malware_family": None,
+                    "threat_actor": None,
+                    "tlp": "white",
+                    "first_seen": None,
+                    "confidence": "medium",
+                    "to_ids": True,
+                }
+                iocs.append(ioc)
+
+            logger.info(f"✅ Extracted {len(iocs)} IPs from GreenSnow")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching GreenSnow feed: {e}")
             return []
 
     def _normalize_otx_type(self, otx_type: str) -> str:
