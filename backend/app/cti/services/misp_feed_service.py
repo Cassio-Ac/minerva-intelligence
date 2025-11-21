@@ -78,7 +78,8 @@ class MISPFeedService:
 
         try:
             # 1. Baixar manifest
-            manifest_url = f"{self.CIRCL_FEED}/manifest.json"
+            circl_url = self.FEEDS["circl_osint"]["url"]
+            manifest_url = f"{circl_url}/manifest.json"
             logger.debug(f"Downloading manifest from {manifest_url}")
 
             response = requests.get(manifest_url, timeout=30)
@@ -92,7 +93,7 @@ class MISPFeedService:
             # 2. Processar eventos (limitado)
             for idx, event_uuid in enumerate(list(manifest.keys())[:limit]):
                 try:
-                    event_url = f"{self.CIRCL_FEED}/{event_uuid}.json"
+                    event_url = f"{circl_url}/{event_uuid}.json"
                     logger.debug(f"[{idx+1}/{limit}] Downloading event {event_uuid}")
 
                     event_resp = requests.get(event_url, timeout=30)
