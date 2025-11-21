@@ -68,6 +68,7 @@ kaleido==0.2.1
 # CTI & Threat Intelligence
 mitreattack-python==3.0.3
 stix2==3.0.1
+pymisp>=2.5.17
 
 # Testing
 pytest==7.4.3
