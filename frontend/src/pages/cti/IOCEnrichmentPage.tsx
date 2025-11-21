@@ -119,7 +119,7 @@ const IOCEnrichmentPage: React.FC = () => {
               style={{
                 backgroundColor: currentColors.bg.secondary,
                 color: currentColors.text.primary,
-                borderColor: currentColors.border.primary,
+                borderColor: currentColors.border.default,
               }}
             >
               <option value="">-- Selecione --</option>
@@ -142,7 +142,7 @@ const IOCEnrichmentPage: React.FC = () => {
               style={{
                 backgroundColor: currentColors.bg.secondary,
                 color: currentColors.text.primary,
-                borderColor: currentColors.border.primary,
+                borderColor: currentColors.border.default,
               }}
             >
               <option value={1}>1 IOC</option>
@@ -156,9 +156,9 @@ const IOCEnrichmentPage: React.FC = () => {
         <button
           onClick={handleEnrichFromFeed}
           disabled={loading || !selectedFeed}
-          className="mt-4 px-6 py-2 rounded flex items-center gap-2 disabled:opacity-50"
+          className="mt-4 px-6 py-2 rounded flex items-center gap-2 disabled:opacity-50 hover:opacity-90 transition-opacity"
           style={{
-            backgroundColor: currentColors.button.primary,
+            backgroundColor: currentColors.accent.primary,
             color: '#fff',
           }}
         >
@@ -198,25 +198,25 @@ const IOCEnrichmentPage: React.FC = () => {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.default }}>
               <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>Feed</p>
               <p className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
                 {enrichResult.feed_name}
               </p>
             </div>
-            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.default }}>
               <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>IOCs Fetched</p>
               <p className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
                 {enrichResult.iocs_fetched}
               </p>
             </div>
-            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.default }}>
               <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>IOCs Enriquecidos</p>
               <p className="text-lg font-semibold" style={{ color: '#10b981' }}>
                 {enrichResult.iocs_enriched}
               </p>
             </div>
-            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.default }}>
               <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>Status</p>
               <div className="flex items-center gap-2">
                 <Check size={16} color="#10b981" />
@@ -225,7 +225,7 @@ const IOCEnrichmentPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="border-t pt-4 mb-4" style={{ borderColor: currentColors.border.primary }}></div>
+          <div className="border-t pt-4 mb-4" style={{ borderColor: currentColors.border.default }}></div>
 
           {/* Enriched IOCs */}
           <h3 className="text-lg font-semibold mb-3" style={{ color: currentColors.text.primary }}>
@@ -237,7 +237,7 @@ const IOCEnrichmentPage: React.FC = () => {
               <div
                 key={index}
                 className="border rounded-lg overflow-hidden"
-                style={{ borderColor: currentColors.border.primary }}
+                style={{ borderColor: currentColors.border.default }}
               >
                 {/* IOC Header */}
                 <div className="p-4 flex items-center gap-3" style={{ backgroundColor: currentColors.bg.secondary }}>
@@ -330,7 +330,7 @@ const IOCEnrichmentPage: React.FC = () => {
                             key={i}
                             className="px-2 py-1 rounded text-xs border"
                             style={{
-                              borderColor: currentColors.border.primary,
+                              borderColor: currentColors.border.default,
                               color: currentColors.text.secondary,
                             }}
                           >
@@ -358,11 +358,11 @@ const IOCEnrichmentPage: React.FC = () => {
                   )}
 
                   {/* Footer */}
-                  <div className="flex gap-2 flex-wrap pt-2 border-t" style={{ borderColor: currentColors.border.primary }}>
+                  <div className="flex gap-2 flex-wrap pt-2 border-t" style={{ borderColor: currentColors.border.default }}>
                     <span
                       className="px-2 py-1 rounded text-xs border"
                       style={{
-                        borderColor: currentColors.border.primary,
+                        borderColor: currentColors.border.default,
                         color: currentColors.text.secondary,
                       }}
                     >
@@ -372,7 +372,7 @@ const IOCEnrichmentPage: React.FC = () => {
                       <span
                         className="px-2 py-1 rounded text-xs border flex items-center gap-1"
                         style={{
-                          borderColor: currentColors.border.primary,
+                          borderColor: currentColors.border.default,
                           color: currentColors.text.secondary,
                         }}
                       >

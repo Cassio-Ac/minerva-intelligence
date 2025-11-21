@@ -116,7 +116,7 @@ const MISPFeedsPage: React.FC = () => {
               style={{
                 backgroundColor: currentColors.bg.secondary,
                 color: currentColors.text.primary,
-                borderColor: currentColors.border.primary,
+                borderColor: currentColors.border.default,
               }}
             >
               <option value="">-- Selecione --</option>
@@ -147,7 +147,7 @@ const MISPFeedsPage: React.FC = () => {
               style={{
                 backgroundColor: currentColors.bg.secondary,
                 color: currentColors.text.primary,
-                borderColor: currentColors.border.primary,
+                borderColor: currentColors.border.default,
               }}
             />
           </div>
@@ -156,9 +156,9 @@ const MISPFeedsPage: React.FC = () => {
         <button
           onClick={handleTestFeed}
           disabled={loading || !selectedFeed}
-          className="mt-4 px-6 py-2 rounded flex items-center gap-2 disabled:opacity-50"
+          className="mt-4 px-6 py-2 rounded flex items-center gap-2 disabled:opacity-50 hover:opacity-90 transition-opacity"
           style={{
-            backgroundColor: currentColors.button.primary,
+            backgroundColor: currentColors.accent.primary,
             color: '#fff',
           }}
         >
@@ -198,25 +198,25 @@ const MISPFeedsPage: React.FC = () => {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.default }}>
               <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>Feed</p>
               <p className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
                 {testResult.feed_name}
               </p>
             </div>
-            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.default }}>
               <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>Itens Processados</p>
               <p className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
                 {testResult.items_processed}
               </p>
             </div>
-            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.default }}>
               <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>IOCs Encontrados</p>
               <p className="text-lg font-semibold" style={{ color: '#10b981' }}>
                 {testResult.iocs_found}
               </p>
             </div>
-            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.primary }}>
+            <div className="p-4 rounded border" style={{ borderColor: currentColors.border.default }}>
               <p className="text-xs mb-1" style={{ color: currentColors.text.secondary }}>Status</p>
               <div className="flex items-center gap-2">
                 <Check size={16} color="#10b981" />
@@ -225,7 +225,7 @@ const MISPFeedsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="border-t pt-4 mb-4" style={{ borderColor: currentColors.border.primary }}></div>
+          <div className="border-t pt-4 mb-4" style={{ borderColor: currentColors.border.default }}></div>
 
           {/* IOC Samples */}
           <h3 className="text-lg font-semibold mb-3" style={{ color: currentColors.text.primary }}>
@@ -263,7 +263,7 @@ const MISPFeedsPage: React.FC = () => {
                       {ioc.confidence && (
                         <span
                           className="px-2 py-1 rounded text-xs border"
-                          style={{ borderColor: currentColors.border.primary, color: currentColors.text.secondary }}
+                          style={{ borderColor: currentColors.border.default, color: currentColors.text.secondary }}
                         >
                           Confidence: {ioc.confidence}
                         </span>
