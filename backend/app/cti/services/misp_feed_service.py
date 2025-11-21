@@ -123,6 +123,21 @@ class MISPFeedService:
             "description": "GreenSnow malicious IPs blocklist",
             "requires_auth": False,
         },
+        # Phase 2B: Additional Feeds
+        "diamondfox_c2": {
+            "name": "DiamondFox C2 Panels (Unit42)",
+            "url": "https://raw.githubusercontent.com/pan-unit42/iocs/master/diamondfox/diamondfox_panels.txt",
+            "type": "txt",
+            "description": "DiamondFox malware C2 panel URLs (Palo Alto Unit42)",
+            "requires_auth": False,
+        },
+        "cins_badguys": {
+            "name": "CINS Score Bad Guys List",
+            "url": "https://cinsscore.com/list/ci-badguys.txt",
+            "type": "txt",
+            "description": "CINS Score malicious IPs list",
+            "requires_auth": False,
+        },
     }
 
     def __init__(self, db: Optional[AsyncSession] = None, es: Optional[AsyncElasticsearch] = None):
@@ -1117,6 +1132,115 @@ class MISPFeedService:
 
         except Exception as e:
             logger.error(f"❌ Error fetching GreenSnow feed: {e}")
+            return []
+
+    def fetch_diamondfox_c2_feed(self, limit: int = 1000) -> List[Dict]:
+        """
+        Importa URLs de painéis C2 do malware DiamondFox
+
+        Feed mantido pela Palo Alto Networks Unit42.
+        Formato TXT simples (uma URL por linha).
+
+        Args:
+            limit: Número máximo de URLs para processar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching DiamondFox C2 Panels from Unit42 (limit={limit})...")
+
+        try:
+            url = self.FEEDS["diamondfox_c2"]["url"]
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            iocs = []
+            lines = response.text.strip().split('\n')
+
+            for line in lines[:limit]:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+
+                # Parse format: URL,timestamp,hash
+                # Exemplo: hxxp://00bot.asterios.ws/fox/,2018-07-02 16:31:02,75b6ce7...
+                parts = line.split(',', 2)
+                c2_url = parts[0].strip() if parts else line
+                timestamp = parts[1].strip() if len(parts) > 1 else None
+
+                # Defang URL (hxxp → http) se necessário para armazenamento
+                # Mas mantém o valor original para fidelidade ao feed
+
+                ioc = {
+                    "type": "url",
+                    "subtype": "url",
+                    "value": c2_url,
+                    "context": "Unit42: DiamondFox C2 Panel",
+                    "tags": ["c2", "diamondfox", "unit42", "malware"],
+                    "malware_family": "DiamondFox",
+                    "threat_actor": None,
+                    "tlp": "white",
+                    "first_seen": timestamp if timestamp else None,
+                    "confidence": "high",  # Unit42 é fonte confiável
+                    "to_ids": True,
+                }
+                iocs.append(ioc)
+
+            logger.info(f"✅ Extracted {len(iocs)} DiamondFox C2 URLs from Unit42")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching DiamondFox C2 feed: {e}")
+            return []
+
+    def fetch_cins_badguys_feed(self, limit: int = 10000) -> List[Dict]:
+        """
+        Importa IPs maliciosos do CINS Score Bad Guys List
+
+        CINS Score é um scoring system para IPs maliciosos.
+        Formato TXT simples (um IP por linha).
+
+        Args:
+            limit: Número máximo de IPs para processar
+
+        Returns:
+            Lista de IOCs extraídos
+        """
+        logger.info(f"📡 Fetching CINS Score Bad Guys List (limit={limit})...")
+
+        try:
+            url = self.FEEDS["cins_badguys"]["url"]
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+
+            iocs = []
+            lines = response.text.strip().split('\n')
+
+            for line in lines[:limit]:
+                ip = line.strip()
+                if not ip or ip.startswith('#'):
+                    continue
+
+                ioc = {
+                    "type": "ip",
+                    "subtype": "ip-src",
+                    "value": ip,
+                    "context": "CINS Score: Bad Guy IP",
+                    "tags": ["cins_score", "malicious_ip", "bad_guys"],
+                    "malware_family": None,
+                    "threat_actor": None,
+                    "tlp": "white",
+                    "first_seen": None,
+                    "confidence": "medium",
+                    "to_ids": True,
+                }
+                iocs.append(ioc)
+
+            logger.info(f"✅ Extracted {len(iocs)} IPs from CINS Score")
+            return iocs
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching CINS Score feed: {e}")
             return []
 
     def _normalize_otx_type(self, otx_type: str) -> str:

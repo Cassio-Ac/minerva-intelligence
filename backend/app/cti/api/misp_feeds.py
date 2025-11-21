@@ -262,6 +262,10 @@ async def test_specific_feed(
         iocs = service.fetch_blocklist_de_feed(limit=limit)
     elif feed_type == "greensnow":
         iocs = service.fetch_greensnow_feed(limit=limit)
+    elif feed_type == "diamondfox_c2":
+        iocs = service.fetch_diamondfox_c2_feed(limit=limit)
+    elif feed_type == "cins_badguys":
+        iocs = service.fetch_cins_badguys_feed(limit=limit)
     else:
         raise HTTPException(status_code=400, detail=f"Feed type '{feed_type}' not implemented yet")
 
@@ -352,6 +356,10 @@ async def sync_specific_feed(
         iocs = service.fetch_blocklist_de_feed(limit=limit)
     elif feed_type == "greensnow":
         iocs = service.fetch_greensnow_feed(limit=limit)
+    elif feed_type == "diamondfox_c2":
+        iocs = service.fetch_diamondfox_c2_feed(limit=limit)
+    elif feed_type == "cins_badguys":
+        iocs = service.fetch_cins_badguys_feed(limit=limit)
     else:
         raise HTTPException(status_code=400, detail=f"Feed type '{feed_type}' not implemented yet")
 
