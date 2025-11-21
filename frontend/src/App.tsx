@@ -17,6 +17,8 @@ import CVEPage from '@pages/CVEPage'
 import TelegramIntelligence from '@pages/TelegramIntelligence'
 import TelegramConversation from '@pages/TelegramConversation'
 import CTIDashboard from '@pages/cti/CTIDashboard'
+import MISPFeedsPage from '@pages/cti/MISPFeedsPage'
+import IOCEnrichmentPage from '@pages/cti/IOCEnrichmentPage'
 import { Header } from './components/Header'
 import { useDashboardStore } from '@stores/dashboardStore'
 import { useSettingsStore } from '@stores/settingsStore'
@@ -128,6 +130,8 @@ function App() {
 
         {/* CTI Dashboard */}
         <Route path="/cti" element={<ProtectedRoute><CTIDashboard /></ProtectedRoute>} />
+        <Route path="/cti/feeds" element={<ProtectedRoute><MISPFeedsPage /></ProtectedRoute>} />
+        <Route path="/cti/enrichment" element={<ProtectedRoute><IOCEnrichmentPage /></ProtectedRoute>} />
 
         {/* Profile Page */}
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
