@@ -220,12 +220,12 @@ class ESServerServiceSQL:
             return []
 
         try:
-            # Criar cliente ES para este servidor
+            # Criar cliente ES para este servidor usando a connection configurada
             es_client = AsyncElasticsearch(
                 hosts=[server.connection.url],
                 basic_auth=(
                     (server.connection.username, server.connection.password)
-                    if server.connection.username
+                    if server.connection.username and server.connection.password
                     else None
                 ),
                 verify_certs=server.connection.verify_ssl,
