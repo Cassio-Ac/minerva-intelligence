@@ -7,8 +7,9 @@ import requests
 import logging
 from typing import List, Dict, Optional
 from datetime import datetime
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from elasticsearch import AsyncElasticsearch
 
 from app.cti.models.misp_feed import MISPFeed
@@ -23,7 +24,7 @@ class MISPFeedService:
     # Feed público do CIRCL (sem autenticação necessária)
     CIRCL_FEED = "https://www.circl.lu/doc/misp/feed-osint/"
 
-    def __init__(self, db: Session, es: Optional[AsyncElasticsearch] = None):
+    def __init__(self, db: Optional[AsyncSession] = None, es: Optional[AsyncElasticsearch] = None):
         self.db = db
         self.es = es
 
@@ -162,7 +163,7 @@ class MISPFeedService:
 
         return metadata
 
-    def import_iocs(
+    async def import_iocs(
         self, iocs: List[Dict], feed_id: str, index_to_es: bool = False
     ) -> int:
         """
@@ -176,6 +177,9 @@ class MISPFeedService:
         Returns:
             Número de IOCs importados
         """
+        if not self.db:
+            raise ValueError("Database session is required for import_iocs")
+
         logger.info(f"📥 Importing {len(iocs)} IOCs to database...")
 
         imported_count = 0
@@ -185,14 +189,12 @@ class MISPFeedService:
         for ioc_data in iocs:
             try:
                 # Verificar se IOC já existe (deduplicação)
-                existing_ioc = (
-                    self.db.query(MISPIoC)
-                    .filter(
-                        MISPIoC.feed_id == feed_id,
-                        MISPIoC.ioc_value == ioc_data["value"],
-                    )
-                    .first()
+                stmt = select(MISPIoC).where(
+                    MISPIoC.feed_id == feed_id,
+                    MISPIoC.ioc_value == ioc_data["value"]
                 )
+                result = await self.db.execute(stmt)
+                existing_ioc = result.scalar_one_or_none()
 
                 if existing_ioc:
                     # Atualizar last_seen
@@ -226,30 +228,31 @@ class MISPFeedService:
 
         # Commit
         try:
-            self.db.commit()
+            await self.db.commit()
             logger.info(
                 f"✅ Import complete: {imported_count} new, {updated_count} updated, {skipped_count} skipped"
             )
 
             # Atualizar contador do feed
-            feed = self.db.query(MISPFeed).filter(MISPFeed.id == feed_id).first()
+            stmt = select(MISPFeed).where(MISPFeed.id == feed_id)
+            result = await self.db.execute(stmt)
+            feed = result.scalar_one_or_none()
+
             if feed:
-                feed.total_iocs_imported = (
-                    self.db.query(func.count(MISPIoC.id))
-                    .filter(MISPIoC.feed_id == feed_id)
-                    .scalar()
-                )
+                count_stmt = select(func.count(MISPIoC.id)).where(MISPIoC.feed_id == feed_id)
+                count_result = await self.db.execute(count_stmt)
+                feed.total_iocs_imported = count_result.scalar()
                 feed.last_sync_at = datetime.now()
-                self.db.commit()
+                await self.db.commit()
 
             return imported_count
 
         except Exception as e:
             logger.error(f"❌ Error committing IOCs: {e}")
-            self.db.rollback()
+            await self.db.rollback()
             return 0
 
-    def search_ioc(self, value: str) -> Optional[MISPIoC]:
+    async def search_ioc(self, value: str) -> Optional[MISPIoC]:
         """
         Buscar IOC por valor
 
@@ -259,61 +262,63 @@ class MISPFeedService:
         Returns:
             IOC encontrado ou None
         """
-        return (
-            self.db.query(MISPIoC)
-            .filter(MISPIoC.ioc_value == value)
-            .first()
-        )
+        if not self.db:
+            raise ValueError("Database session is required for search_ioc")
 
-    def get_ioc_stats(self) -> Dict:
+        stmt = select(MISPIoC).where(MISPIoC.ioc_value == value)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_ioc_stats(self) -> Dict:
         """
         Obter estatísticas de IOCs
 
         Returns:
             Dicionário com estatísticas
         """
-        total_iocs = self.db.query(func.count(MISPIoC.id)).scalar()
+        if not self.db:
+            raise ValueError("Database session is required for get_ioc_stats")
+
+        # Total IOCs
+        count_stmt = select(func.count(MISPIoC.id))
+        result = await self.db.execute(count_stmt)
+        total_iocs = result.scalar()
 
         # Por tipo
         by_type = {}
-        type_counts = (
-            self.db.query(MISPIoC.ioc_type, func.count(MISPIoC.id))
-            .group_by(MISPIoC.ioc_type)
-            .all()
-        )
-        for ioc_type, count in type_counts:
+        type_stmt = select(MISPIoC.ioc_type, func.count(MISPIoC.id)).group_by(MISPIoC.ioc_type)
+        result = await self.db.execute(type_stmt)
+        for ioc_type, count in result.all():
             by_type[ioc_type] = count
 
         # Por TLP
         by_tlp = {}
-        tlp_counts = (
-            self.db.query(MISPIoC.tlp, func.count(MISPIoC.id))
-            .group_by(MISPIoC.tlp)
-            .all()
-        )
-        for tlp, count in tlp_counts:
+        tlp_stmt = select(MISPIoC.tlp, func.count(MISPIoC.id)).group_by(MISPIoC.tlp)
+        result = await self.db.execute(tlp_stmt)
+        for tlp, count in result.all():
             by_tlp[tlp] = count
 
         # Por confidence
         by_confidence = {}
-        conf_counts = (
-            self.db.query(MISPIoC.confidence, func.count(MISPIoC.id))
-            .group_by(MISPIoC.confidence)
-            .all()
-        )
-        for confidence, count in conf_counts:
+        conf_stmt = select(MISPIoC.confidence, func.count(MISPIoC.id)).group_by(MISPIoC.confidence)
+        result = await self.db.execute(conf_stmt)
+        for confidence, count in result.all():
             by_confidence[confidence] = count
 
         # Feeds
-        feeds_count = self.db.query(func.count(MISPFeed.id)).scalar()
+        feeds_stmt = select(func.count(MISPFeed.id))
+        result = await self.db.execute(feeds_stmt)
+        feeds_count = result.scalar()
 
         # Última sync
-        last_feed = (
-            self.db.query(MISPFeed)
-            .filter(MISPFeed.last_sync_at.isnot(None))
+        last_feed_stmt = (
+            select(MISPFeed)
+            .where(MISPFeed.last_sync_at.isnot(None))
             .order_by(MISPFeed.last_sync_at.desc())
-            .first()
+            .limit(1)
         )
+        result = await self.db.execute(last_feed_stmt)
+        last_feed = result.scalar_one_or_none()
 
         return {
             "total_iocs": total_iocs,
@@ -324,18 +329,40 @@ class MISPFeedService:
             "last_sync": last_feed.last_sync_at if last_feed else None,
         }
 
-    def list_feeds(self) -> List[MISPFeed]:
+    async def list_feeds(self) -> List[MISPFeed]:
         """Listar todos os feeds"""
-        return self.db.query(MISPFeed).all()
+        if not self.db:
+            raise ValueError("Database session is required for list_feeds")
 
-    def get_feed(self, feed_id: str) -> Optional[MISPFeed]:
+        stmt = select(MISPFeed)
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_feed(self, feed_id: str) -> Optional[MISPFeed]:
         """Obter feed por ID"""
-        return self.db.query(MISPFeed).filter(MISPFeed.id == feed_id).first()
+        if not self.db:
+            raise ValueError("Database session is required for get_feed")
 
-    def create_feed(self, feed_data: Dict) -> MISPFeed:
+        stmt = select(MISPFeed).where(MISPFeed.id == feed_id)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_feed_by_name(self, name: str) -> Optional[MISPFeed]:
+        """Obter feed por nome"""
+        if not self.db:
+            raise ValueError("Database session is required for get_feed_by_name")
+
+        stmt = select(MISPFeed).where(MISPFeed.name == name)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def create_feed(self, feed_data: Dict) -> MISPFeed:
         """Criar novo feed"""
+        if not self.db:
+            raise ValueError("Database session is required for create_feed")
+
         feed = MISPFeed(**feed_data)
         self.db.add(feed)
-        self.db.commit()
-        self.db.refresh(feed)
+        await self.db.commit()
+        await self.db.refresh(feed)
         return feed
