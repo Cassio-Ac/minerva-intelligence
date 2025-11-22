@@ -9,7 +9,7 @@
 
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8002';
 const CTI_BASE = `${API_URL}/api/v1/cti`;
 
 // Helper to get auth token from Zustand persist storage
