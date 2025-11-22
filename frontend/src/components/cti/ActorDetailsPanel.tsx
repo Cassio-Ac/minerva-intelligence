@@ -10,9 +10,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Globe, Flag, Target, Shield, Users, AlertTriangle, ExternalLink, Activity } from 'lucide-react';
+import { X, Loader2, Globe, Flag, Target, Shield, Users, AlertTriangle, ExternalLink, Activity, Database } from 'lucide-react';
 import { useSettingsStore } from '@stores/settingsStore';
 import { ctiService, Actor, ActorGeopoliticalData, ActorTechniquesResponse } from '../../services/cti/ctiService';
+import mispFeedsService, { MISPIoC } from '../../services/cti/mispFeedsService';
 
 interface ActorDetailsPanelProps {
   actorName: string;
@@ -28,7 +29,9 @@ const ActorDetailsPanel: React.FC<ActorDetailsPanelProps> = ({ actorName, onClos
   const [actor, setActor] = useState<Actor | null>(null);
   const [geopoliticalData, setGeopoliticalData] = useState<ActorGeopoliticalData | null>(null);
   const [techniques, setTechniques] = useState<ActorTechniquesResponse | null>(null);
+  const [iocs, setIOCs] = useState<MISPIoC[]>([]);
   const [loadingTechniques, setLoadingTechniques] = useState(false);
+  const [loadingIOCs, setLoadingIOCs] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +80,22 @@ const ActorDetailsPanel: React.FC<ActorDetailsPanelProps> = ({ actorName, onClos
       // Non-critical error - actor may not have enrichment yet
     } finally {
       setLoadingTechniques(false);
+    }
+  };
+
+  const loadIOCs = async () => {
+    setLoadingIOCs(true);
+    try {
+      const response = await mispFeedsService.listIOCs({
+        threat_actor: actorName,
+        limit: 20
+      });
+      setIOCs(response.iocs);
+    } catch (error) {
+      console.warn('IOCs not available for actor:', error);
+      // Non-critical error
+    } finally {
+      setLoadingIOCs(false);
     }
   };
 
@@ -454,6 +473,98 @@ const ActorDetailsPanel: React.FC<ActorDetailsPanelProps> = ({ actorName, onClos
                 </div>
               </div>
             )}
+
+            {/* MISP IOCs - Related Indicators */}
+            <div
+              className="p-4 rounded-lg border"
+              style={{
+                backgroundColor: currentColors.bg.secondary,
+                borderColor: currentColors.border.default
+              }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Database size={20} style={{ color: '#f59e0b' }} />
+                  <h3 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+                    MISP IOCs
+                  </h3>
+                </div>
+                {iocs.length === 0 && !loadingIOCs && (
+                  <button
+                    onClick={loadIOCs}
+                    className="px-3 py-1 rounded text-sm hover:opacity-80 transition-opacity"
+                    style={{
+                      backgroundColor: '#f59e0b',
+                      color: '#fff'
+                    }}
+                  >
+                    Load IOCs
+                  </button>
+                )}
+              </div>
+
+              {loadingIOCs && (
+                <div className="flex justify-center p-4">
+                  <Loader2 size={20} className="animate-spin" style={{ color: '#f59e0b' }} />
+                </div>
+              )}
+
+              {iocs.length > 0 && (
+                <div>
+                  <div className="mb-3">
+                    <span className="text-xs" style={{ color: currentColors.text.secondary }}>
+                      {iocs.length} IOCs found in MISP feeds
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {iocs.map((ioc) => (
+                      <div
+                        key={ioc.id}
+                        className="p-3 rounded border"
+                        style={{
+                          backgroundColor: currentColors.bg.primary,
+                          borderColor: currentColors.border.default
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-mono text-xs mb-1 break-all" style={{ color: currentColors.text.primary }}>
+                              {ioc.value}
+                            </p>
+                            <div className="flex gap-1 flex-wrap">
+                              <span
+                                className="px-2 py-0.5 rounded text-xs"
+                                style={{
+                                  backgroundColor: ioc.type === 'ip' ? '#3b82f6' : ioc.type === 'domain' ? '#10b981' : ioc.type === 'url' ? '#8b5cf6' : '#06b6d4',
+                                  color: '#fff'
+                                }}
+                              >
+                                {ioc.type}
+                              </span>
+                              {ioc.malware_family && (
+                                <span
+                                  className="px-2 py-0.5 rounded text-xs"
+                                  style={{ backgroundColor: '#dc2626', color: '#fff' }}
+                                >
+                                  {ioc.malware_family}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {iocs.length === 0 && !loadingIOCs && (
+                <p className="text-sm text-center py-4" style={{ color: currentColors.text.secondary }}>
+                  Click "Load IOCs" to view indicators from MISP feeds
+                </p>
+              )}
+            </div>
 
             {/* Malpedia Link */}
             {actor.url && (

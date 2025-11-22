@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # Database URL (PostgreSQL com asyncpg driver)
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+asyncpg://dashboard_user:dashboard_pass_secure_2024@localhost:5432/dashboard_ai"
+    "postgresql+asyncpg://intelligence_user:intelligence_pass_secure_2024@localhost:5433/intelligence_platform"
 )
 
 # Create async engine

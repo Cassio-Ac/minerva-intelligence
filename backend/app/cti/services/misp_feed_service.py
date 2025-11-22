@@ -1349,7 +1349,7 @@ class MISPFeedService:
 
     async def search_ioc(self, value: str) -> Optional[MISPIoC]:
         """
-        Buscar IOC por valor
+        Buscar IOC por valor no banco de dados
 
         Args:
             value: Valor do IOC (IP, domain, hash, etc)
@@ -1363,6 +1363,62 @@ class MISPFeedService:
         stmt = select(MISPIoC).where(MISPIoC.ioc_value == value)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
+
+    def search_ioc_in_live_feeds(self, value: str, max_feeds_to_check: int = 5) -> Optional[Dict]:
+        """
+        Buscar IOC nos feeds ao vivo (sem persistir no banco)
+
+        Args:
+            value: Valor do IOC para buscar
+            max_feeds_to_check: Máximo de feeds para verificar (para não demorar muito)
+
+        Returns:
+            Dict com dados do IOC se encontrado, None caso contrário
+        """
+        logger.info(f"🔍 Searching for '{value}' in live feeds...")
+
+        # List of feeds to check (prioritize most likely feeds based on IOC type)
+        feeds_to_check = [
+            "diamondfox_c2",  # URLs
+            "urlhaus",  # URLs
+            "sslbl",  # SSL fingerprints
+            "threatfox",  # General IOCs
+            "openphish",  # Phishing URLs
+        ]
+
+        for feed_id in feeds_to_check[:max_feeds_to_check]:
+            try:
+                logger.info(f"   Checking feed: {feed_id}")
+
+                # Fetch IOCs from this feed
+                iocs = []
+                if feed_id == "diamondfox_c2":
+                    iocs = self.fetch_diamondfox_c2_feed(limit=100)
+                elif feed_id == "urlhaus":
+                    iocs = self.fetch_urlhaus_feed(limit=100)
+                elif feed_id == "sslbl":
+                    iocs = self.fetch_sslbl_feed(limit=100)
+                elif feed_id == "threatfox":
+                    iocs = self.fetch_threatfox_feed(limit=100)
+                elif feed_id == "openphish":
+                    iocs = self.fetch_openphish_feed(limit=100)
+
+                # Search for the value in this feed's IOCs
+                for ioc in iocs:
+                    ioc_value = ioc.get("value", "").lower()
+                    search_value = value.lower()
+
+                    # Check if values match (exact or contains)
+                    if search_value in ioc_value or ioc_value in search_value:
+                        logger.info(f"   ✅ Found match in {feed_id}!")
+                        return ioc
+
+            except Exception as e:
+                logger.warning(f"   ⚠️ Error checking feed {feed_id}: {e}")
+                continue
+
+        logger.info(f"   ❌ Not found in any live feed")
+        return None
 
     async def get_ioc_stats(self) -> Dict:
         """
@@ -1400,6 +1456,18 @@ class MISPFeedService:
         for confidence, count in result.all():
             by_confidence[confidence] = count
 
+        # Por feed (join com MISPFeed para pegar o nome)
+        by_feed = {}
+        feed_stmt = (
+            select(MISPFeed.name, func.count(MISPIoC.id))
+            .select_from(MISPIoC)
+            .join(MISPFeed, MISPIoC.feed_id == MISPFeed.id)
+            .group_by(MISPFeed.name)
+        )
+        result = await self.db.execute(feed_stmt)
+        for feed_name, count in result.all():
+            by_feed[feed_name] = count
+
         # Feeds
         feeds_stmt = select(func.count(MISPFeed.id))
         result = await self.db.execute(feeds_stmt)
@@ -1420,6 +1488,7 @@ class MISPFeedService:
             "by_type": by_type,
             "by_tlp": by_tlp,
             "by_confidence": by_confidence,
+            "by_feed": by_feed,
             "feeds_count": feeds_count,
             "last_sync": last_feed.last_sync_at if last_feed else None,
         }
@@ -1441,6 +1510,85 @@ class MISPFeedService:
         stmt = select(MISPFeed).where(MISPFeed.id == feed_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def list_iocs(
+        self,
+        ioc_type: Optional[str] = None,
+        threat_actor: Optional[str] = None,
+        malware_family: Optional[str] = None,
+        feed_id: Optional[str] = None,
+        limit: int = 100,
+        offset: int = 0
+    ) -> Dict:
+        """
+        Listar IOCs com filtros opcionais
+
+        Args:
+            ioc_type: Tipo do IOC (ip, domain, url, hash, email)
+            threat_actor: Filtrar por threat actor
+            malware_family: Filtrar por família de malware
+            feed_id: Filtrar por feed
+            limit: Limite de resultados
+            offset: Offset para paginação
+
+        Returns:
+            Dict com IOCs e metadados
+        """
+        if not self.db:
+            raise ValueError("Database session is required for list_iocs")
+
+        # Base query
+        stmt = select(MISPIoC)
+
+        # Aplicar filtros
+        if ioc_type:
+            stmt = stmt.where(MISPIoC.ioc_type == ioc_type)
+        if threat_actor:
+            stmt = stmt.where(MISPIoC.threat_actor == threat_actor)
+        if malware_family:
+            stmt = stmt.where(MISPIoC.malware_family == malware_family)
+        if feed_id:
+            stmt = stmt.where(MISPIoC.feed_id == feed_id)
+
+        # Count total (before pagination)
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_result = await self.db.execute(count_stmt)
+        total = count_result.scalar()
+
+        # Ordenar e paginar
+        stmt = stmt.order_by(MISPIoC.created_at.desc()).limit(limit).offset(offset)
+
+        # Executar
+        result = await self.db.execute(stmt)
+        iocs = result.scalars().all()
+
+        # Converter para dict
+        iocs_list = []
+        for ioc in iocs:
+            iocs_list.append({
+                "id": str(ioc.id),
+                "type": ioc.ioc_type,
+                "subtype": ioc.ioc_subtype,
+                "value": ioc.ioc_value,
+                "context": ioc.context,
+                "malware_family": ioc.malware_family,
+                "threat_actor": ioc.threat_actor,
+                "tags": ioc.tags,
+                "tlp": ioc.tlp,
+                "confidence": ioc.confidence,
+                "first_seen": ioc.first_seen.isoformat() if ioc.first_seen else None,
+                "last_seen": ioc.last_seen.isoformat() if ioc.last_seen else None,
+                "created_at": ioc.created_at.isoformat() if ioc.created_at else None,
+                "feed_id": str(ioc.feed_id)
+            })
+
+        return {
+            "iocs": iocs_list,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": (offset + limit) < total
+        }
 
     async def get_feed_by_name(self, name: str) -> Optional[MISPFeed]:
         """Obter feed por nome"""

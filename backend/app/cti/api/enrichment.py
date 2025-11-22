@@ -14,7 +14,7 @@ import logging
 
 from app.api.v1.auth import get_current_user
 from ..services.enrichment_cache_service import get_enrichment_cache_service
-from ..services.misp_galaxy_service import get_misp_galaxy_service
+# from ..services.misp_galaxy_service import get_misp_galaxy_service  # TODO: Update to use new MISPGalaxyService class
 
 router = APIRouter(prefix="/enrichment", tags=["CTI Enrichment"])
 logger = logging.getLogger(__name__)
@@ -231,38 +231,39 @@ async def clear_cache(
         )
 
 
-@router.get("/geopolitical/{actor_name}", response_model=ActorGeopoliticalData)
-async def get_actor_geopolitical_data(
-    actor_name: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Get geopolitical data for a threat actor from MISP Galaxy
-
-    Returns:
-    - Country of origin
-    - State sponsor
-    - Military unit (if applicable)
-    - Targeted countries
-    - Targeted sectors
-    - Incident type
-    - Attribution confidence
-    - Additional aliases
-    - MISP references
-
-    Example: /api/v1/cti/enrichment/geopolitical/APT28
-    """
-    try:
-        misp_service = get_misp_galaxy_service()
-        data = misp_service.enrich_actor(actor_name)
-
-        logger.info(f"📍 Geopolitical data for {actor_name}: {data.get('country', 'N/A')}")
-
-        return ActorGeopoliticalData(**data)
-
-    except Exception as e:
-        logger.error(f"❌ Error getting geopolitical data: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting geopolitical data: {str(e)}"
-        )
+# TODO: Restore geopolitical endpoint with new MISPGalaxyService implementation
+# @router.get("/geopolitical/{actor_name}", response_model=ActorGeopoliticalData)
+# async def get_actor_geopolitical_data(
+#     actor_name: str,
+#     current_user: dict = Depends(get_current_user)
+# ):
+#     """
+#     Get geopolitical data for a threat actor from MISP Galaxy
+#
+#     Returns:
+#     - Country of origin
+#     - State sponsor
+#     - Military unit (if applicable)
+#     - Targeted countries
+#     - Targeted sectors
+#     - Incident type
+#     - Attribution confidence
+#     - Additional aliases
+#     - MISP references
+#
+#     Example: /api/v1/cti/enrichment/geopolitical/APT28
+#     """
+#     try:
+#         misp_service = get_misp_galaxy_service()
+#         data = misp_service.enrich_actor(actor_name)
+#
+#         logger.info(f"📍 Geopolitical data for {actor_name}: {data.get('country', 'N/A')}")
+#
+#         return ActorGeopoliticalData(**data)
+#
+#     except Exception as e:
+#         logger.error(f"❌ Error getting geopolitical data: {e}")
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail=f"Error getting geopolitical data: {str(e)}"
+#         )

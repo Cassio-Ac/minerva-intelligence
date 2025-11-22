@@ -12,22 +12,38 @@
 
 ---
 
-## ⚠️ IMPORTANTE: Configuração de Portas
+## ⚠️ IMPORTANTE: Configuração de Portas e Database
 
 Este projeto usa portas customizadas para evitar conflitos com Dashboard AI v2:
 
-| Serviço | Porta | URL | Modo |
-|---------|-------|-----|------|
+| Serviço | Porta | URL | Database/Config |
+|---------|-------|-----|-----------------|
 | 🌐 **Frontend (Docker)** | **5174** | `http://localhost:5174` | Produção-like |
 | 💻 **Frontend (Dev)** | **5180** | `http://localhost:5180` | Desenvolvimento (hot reload) |
-| 🔌 **Backend API** | **8001** | `http://localhost:8001` | Docker |
+| 🔌 **Backend API** | **8001** | `http://localhost:8001` | - |
 | 📚 **API Docs** | **8001** | `http://localhost:8001/docs` | - |
-| 🗄️ **PostgreSQL** | **5433** | `localhost:5433` | Docker |
-| 🔴 **Redis** | **6380** | `localhost:6380` | Docker |
+| 🗄️ **PostgreSQL** | **5433** | `localhost:5433` | **intelligence_platform** |
+| 🔴 **Redis** | **6380** | `localhost:6380` | - |
+
+### 🎯 Database Configuration (CRÍTICO!)
+
+**✅ CORRETO** (Intelligence Platform):
+```
+Port: 5433
+Database: intelligence_platform
+User: intelligence_user
+Password: intelligence_pass_secure_2024
+```
+
+**❌ ERRADO** (Dashboard AI - NÃO USAR):
+```
+Port: 5432
+Database: dashboard_ai
+```
 
 **💡 Recomendação**: Use **porta 5180** (dev mode) para desenvolvimento ativo com hot reload.
 
-**📖 Consulte [`PORTS_REFERENCE.md`](./PORTS_REFERENCE.md) para detalhes completos sobre portas, modos de execução e troubleshooting.**
+**📖 Consulte [`PORTS_REFERENCE.md`](./PORTS_REFERENCE.md) para detalhes completos sobre portas, databases, modos de execução e troubleshooting.**
 
 ---
 
@@ -72,8 +88,8 @@ Este projeto usa portas customizadas para evitar conflitos com Dashboard AI v2:
 
 | Módulo | Status | Descrição | Documentação |
 |--------|--------|-----------|--------------|
-| 🎯 **CTI (Cyber Threat Intelligence)** | ✅ Operacional | 864 actors, MITRE ATT&CK + LLM enrichment | [ROTINAS_CTI_COMPLETAS.md](ROTINAS_CTI_COMPLETAS.md) |
-| 📡 **RSS Intelligence** | ✅ Operacional | 800+ artigos, 38 fontes, chat RAG | [docs/RESUMO_RSS_INTELLIGENCE.md](docs/RESUMO_RSS_INTELLIGENCE.md) |
+| 🎯 **CTI (Cyber Threat Intelligence)** | ✅ Operacional | 864 actors, MITRE ATT&CK, MISP Galaxy, 14 feeds (12 ativos, sync 4x/dia, 75% MISP padrão, 1.1K IOCs) | [📖 MISP_FEEDS_DOCUMENTATION.md](backend/MISP_FEEDS_DOCUMENTATION.md) ⭐, [ROTINAS_CTI_COMPLETAS.md](ROTINAS_CTI_COMPLETAS.md), [MISP_SYNC_SCHEDULE.md](backend/MISP_SYNC_SCHEDULE.md) |
+| 📡 **RSS Intelligence** | ✅ Operacional | 800+ artigos, 38 fontes (sync 2x/dia), chat RAG | [docs/RESUMO_RSS_INTELLIGENCE.md](docs/RESUMO_RSS_INTELLIGENCE.md) |
 | 💬 **Telegram Intelligence** | ✅ Operacional | 150+ grupos, busca, contexto, análise | [docs/TELEGRAM_INTELLIGENCE_FIXES.md](docs/TELEGRAM_INTELLIGENCE_FIXES.md) |
 | 🔒 **CVE Intelligence** | ✅ Operacional | Tracking de vulnerabilidades CVE | Página: `/cve` |
 | 🚨 **Data Breaches** | ✅ Operacional | Análise de vazamentos de dados | Página: `/breaches` |

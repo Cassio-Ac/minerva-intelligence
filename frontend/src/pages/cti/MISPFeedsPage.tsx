@@ -21,7 +21,7 @@ const MISPFeedsPage: React.FC = () => {
   const { currentColors } = useSettingsStore();
   const [availableFeeds, setAvailableFeeds] = useState<AvailableFeed[]>([]);
   const [selectedFeed, setSelectedFeed] = useState<string>('');
-  const [limit, setLimit] = useState<number>(5);
+  const [limit, setLimit] = useState<number>(20);
   const [loading, setLoading] = useState(false);
   const [testResult, setTestResult] = useState<FeedTestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +88,7 @@ const MISPFeedsPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
+    <div className="h-screen overflow-y-auto p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
@@ -140,9 +140,9 @@ const MISPFeedsPage: React.FC = () => {
             <input
               type="number"
               value={limit}
-              onChange={(e) => setLimit(parseInt(e.target.value) || 5)}
+              onChange={(e) => setLimit(parseInt(e.target.value) || 20)}
               min="1"
-              max="50"
+              max="5000"
               className="w-full p-2 rounded border"
               style={{
                 backgroundColor: currentColors.bg.secondary,

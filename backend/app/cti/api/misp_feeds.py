@@ -11,6 +11,8 @@ from uuid import UUID
 
 from app.db.database import get_db
 from app.cti.services.misp_feed_service import MISPFeedService
+from app.cti.services.otx_service import OTXService
+from app.cti.services.ioc_enrichment_service import IOCEnrichmentService
 from app.cti.schemas.misp_ioc import (
     MISPFeed,
     MISPFeedCreate,
@@ -113,6 +115,27 @@ async def list_feeds(
     return feeds
 
 
+@router.get("/feeds/available", summary="List available public feeds")
+async def list_available_feeds(
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Listar todos os feeds públicos disponíveis
+
+    Retorna lista de feeds que podem ser configurados
+    """
+    service = MISPFeedService()
+    return {
+        "feeds": [
+            {
+                "id": feed_id,
+                **feed_info
+            }
+            for feed_id, feed_info in service.FEEDS.items()
+        ]
+    }
+
+
 @router.get("/feeds/{feed_id}", response_model=MISPFeed, summary="Get feed by ID")
 async def get_feed(
     feed_id: UUID,
@@ -145,27 +168,75 @@ async def create_feed(
     return feed
 
 
-@router.get("/iocs/search", response_model=MISPIoCSearch, summary="Search IOC by value")
+@router.get("/iocs/search", summary="Search IOC by value")
 async def search_ioc(
     value: str = Query(..., description="IOC value (IP, domain, hash, etc)"),
+    search_live_feeds: bool = Query(default=True, description="Search in live feeds if not found in database"),
+    enrich_with_llm: bool = Query(default=True, description="Automatically enrich IOC with LLM analysis"),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Buscar IOC por valor
+    Buscar IOC por valor (MISP database + live feeds + OTX + LLM enrichment)
 
     **Exemplo:**
     - `value=185.176.43.94` → busca IP
     - `value=evil.com` → busca domain
     - `value=db349b97c37d22f5ea1d1841e3c89eb4` → busca hash MD5
+
+    **Search sources:**
+    1. MISP Database (fast)
+    2. MISP Live feeds (slower, only if search_live_feeds=true)
+    3. AlienVault OTX (always searched)
+    4. LLM Enrichment (if enrich_with_llm=true and IOC found)
     """
     service = MISPFeedService(db)
+    otx_service = OTXService()
+    enrichment_service = IOCEnrichmentService()
+
+    # Initialize results
+    misp_result = None
+    otx_result = None
+    enrichment_result = None
+
+    # Search in MISP database first
     ioc = await service.search_ioc(value)
+    if ioc:
+        misp_result = {"found": True, "ioc": ioc, "source": "database"}
+        logger.info(f"✅ Found in MISP database")
 
-    if not ioc:
-        return {"found": False, "ioc": None, "message": "IOC not found in MISP database"}
+    # Search in live feeds if not found in database and enabled
+    elif search_live_feeds:
+        logger.info(f"🔍 Searching '{value}' in MISP live feeds...")
+        ioc = service.search_ioc_in_live_feeds(value)
+        if ioc:
+            misp_result = {"found": True, "ioc": ioc, "source": "live_feeds"}
+            logger.info(f"✅ Found in MISP live feeds")
 
-    return {"found": True, "ioc": ioc, "message": None}
+    # If not found in MISP
+    if not misp_result:
+        misp_result = {"found": False, "ioc": None, "source": None, "message": "Not found in MISP database or live feeds"}
+
+    # Always search in OTX
+    logger.info(f"🔍 Searching '{value}' in AlienVault OTX...")
+    otx_result = otx_service.search_indicator(value)
+
+    # LLM Enrichment if IOC was found and enrichment enabled
+    if enrich_with_llm and misp_result.get("found"):
+        logger.info(f"🧠 Enriching IOC with LLM analysis...")
+        try:
+            ioc_data = misp_result["ioc"]
+            enrichment_result = await enrichment_service.enrich_ioc_with_llm(ioc_data)
+            logger.info(f"✅ LLM enrichment completed")
+        except Exception as e:
+            logger.error(f"❌ LLM enrichment failed: {e}")
+            enrichment_result = {"error": str(e)}
+
+    return {
+        "misp": misp_result,
+        "otx": otx_result,
+        "enrichment": enrichment_result
+    }
 
 
 @router.get("/iocs/stats", response_model=MISPIoCStats, summary="Get IOC statistics")
@@ -181,31 +252,44 @@ async def get_ioc_stats(
     return stats
 
 
-@router.get("/feeds/available", summary="List available public feeds")
-async def list_available_feeds(
+@router.get("/iocs", summary="List IOCs with filtering")
+async def list_iocs(
+    ioc_type: Optional[str] = Query(None, description="Filter by IOC type (ip, domain, url, hash, email)"),
+    threat_actor: Optional[str] = Query(None, description="Filter by threat actor"),
+    malware_family: Optional[str] = Query(None, description="Filter by malware family"),
+    feed_id: Optional[str] = Query(None, description="Filter by feed ID"),
+    limit: int = Query(default=100, ge=1, le=1000, description="Number of IOCs to return"),
+    offset: int = Query(default=0, ge=0, description="Offset for pagination"),
+    db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Listar todos os feeds públicos disponíveis
+    Listar IOCs salvos no banco com filtros opcionais
 
-    Retorna lista de feeds que podem ser configurados
+    **Filtros:**
+    - `ioc_type`: ip, domain, url, hash, email
+    - `threat_actor`: Nome do threat actor
+    - `malware_family`: Nome da família de malware
+    - `feed_id`: UUID do feed
+    - `limit`: Quantidade máxima de resultados
+    - `offset`: Paginação
     """
-    service = MISPFeedService()
-    return {
-        "feeds": [
-            {
-                "id": feed_id,
-                **feed_info
-            }
-            for feed_id, feed_info in service.FEEDS.items()
-        ]
-    }
+    service = MISPFeedService(db)
+    iocs = await service.list_iocs(
+        ioc_type=ioc_type,
+        threat_actor=threat_actor,
+        malware_family=malware_family,
+        feed_id=feed_id,
+        limit=limit,
+        offset=offset
+    )
+    return iocs
 
 
 @router.post("/feeds/test/{feed_type}", summary="Test specific feed type")
 async def test_specific_feed(
     feed_type: str,
-    limit: int = Query(default=5, ge=1, le=50, description="Number of events/items to process"),
+    limit: int = Query(default=5, ge=1, le=5000, description="Number of events/items to process"),
     otx_api_key: Optional[str] = Query(None, description="OTX API key (required for OTX feed)"),
     use_pagination: bool = Query(default=False, description="Use pagination for OTX (slower but more complete)"),
     current_user: dict = Depends(get_current_user),
@@ -283,7 +367,7 @@ async def test_specific_feed(
 @router.post("/feeds/sync/{feed_type}", summary="Sync specific feed to database")
 async def sync_specific_feed(
     feed_type: str,
-    limit: int = Query(default=100, ge=1, le=1000, description="Number of items to sync"),
+    limit: int = Query(default=100, ge=1, le=10000, description="Number of items to sync"),
     otx_api_key: Optional[str] = Query(None, description="OTX API key (required for OTX)"),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),

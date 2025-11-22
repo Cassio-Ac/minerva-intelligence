@@ -15,7 +15,7 @@ celery_app = Celery(
     "minerva",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["app.tasks.rss_tasks", "app.tasks.malpedia_tasks"]
+    include=["app.tasks.rss_tasks", "app.tasks.malpedia_tasks", "app.tasks.misp_tasks"]
 )
 
 # Celery configuration
@@ -49,6 +49,12 @@ celery_app.conf.update(
         "enrich-malpedia-library": {
             "task": "app.tasks.malpedia_tasks.enrich_malpedia_library",
             "schedule": crontab(minute=0, hour=2),  # 02:00 AM
+        },
+
+        # MISP feeds sync - 4x per day (00:00, 06:00, 12:00, 18:00 Brazil time)
+        "sync-misp-feeds": {
+            "task": "app.tasks.misp_tasks.sync_all_misp_feeds",
+            "schedule": crontab(minute=0, hour="0,6,12,18"),  # Every 6 hours
         },
     },
 )

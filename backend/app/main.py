@@ -28,7 +28,7 @@ from app.api.v1 import rss  # RSS feeds
 from app.api.v1 import breaches  # Data Breaches & Leaks
 from app.api.v1 import cves  # CVE Detection
 from app.api.v1 import telegram  # Telegram Intelligence
-from app.cti.api import actors as cti_actors, families as cti_families, techniques as cti_techniques, enrichment as cti_enrichment, misp_feeds, ioc_enrichment  # CTI Module (isolated)
+from app.cti.api import actors as cti_actors, families as cti_families, techniques as cti_techniques, enrichment as cti_enrichment, misp_feeds, ioc_enrichment, galaxy as cti_galaxy  # CTI Module (isolated)
 from app.websocket import sio
 from app.middleware.metrics_middleware import MetricsMiddleware
 
@@ -105,6 +105,7 @@ app.include_router(cti_techniques.router, prefix="/api/v1/cti", tags=["CTI"])
 app.include_router(cti_enrichment.router, prefix="/api/v1/cti", tags=["CTI Enrichment"])
 app.include_router(misp_feeds.router, prefix="/api/v1/cti", tags=["CTI - MISP"])
 app.include_router(ioc_enrichment.router, prefix="/api/v1/cti", tags=["CTI - IOC Enrichment"])
+app.include_router(cti_galaxy.router, prefix="/api/v1/cti", tags=["CTI - MISP Galaxy"])
 
 # Mount static files (profile photos, downloads, etc)
 app.mount("/static", StaticFiles(directory="static"), name="static")

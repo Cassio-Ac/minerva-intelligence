@@ -100,5 +100,6 @@ class MISPIoCStats(BaseModel):
     by_type: dict
     by_tlp: dict
     by_confidence: dict
+    by_feed: dict
     feeds_count: int
     last_sync: Optional[datetime] = None

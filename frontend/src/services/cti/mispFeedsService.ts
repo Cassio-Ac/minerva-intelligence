@@ -53,8 +53,43 @@ export interface AvailableFeed {
 export interface IOCStats {
   total_iocs: number;
   by_type: Record<string, number>;
+  by_tlp: Record<string, number>;
+  by_confidence: Record<string, number>;
   by_feed: Record<string, number>;
-  recent_iocs: MISPIoC[];
+  feeds_count: number;
+  last_sync: string | null;
+}
+
+export interface OTXResult {
+  found: boolean;
+  pulses: number;
+  tags?: string[];
+  malware_families?: string[] | null;
+  pulse_names?: string[];
+  message: string;
+}
+
+export interface LLMEnrichmentResult {
+  threat_type: string;
+  severity: string;
+  techniques: string[];
+  tactics: string[];
+  summary: string;
+  detection_methods: string[];
+  confidence: string;
+  llm_used?: string;
+  error?: string;
+}
+
+export interface IOCSearchResult {
+  misp: {
+    found: boolean;
+    ioc?: MISPIoC;
+    source?: string | null;
+    message?: string;
+  };
+  otx: OTXResult;
+  enrichment?: LLMEnrichmentResult | null;
 }
 
 class MISPFeedsService {
@@ -107,9 +142,9 @@ class MISPFeedsService {
   }
 
   /**
-   * Busca IOC por valor
+   * Busca IOC por valor (MISP + OTX)
    */
-  async searchIoC(value: string): Promise<{ found: boolean; ioc?: MISPIoC; message?: string }> {
+  async searchIoC(value: string): Promise<IOCSearchResult> {
     const response = await api.get('/cti/misp/iocs/search', {
       params: { value }
     });
@@ -121,6 +156,27 @@ class MISPFeedsService {
    */
   async getStats(): Promise<IOCStats> {
     const response = await api.get('/cti/misp/iocs/stats');
+    return response.data;
+  }
+
+  /**
+   * Lista IOCs com filtros opcionais
+   */
+  async listIOCs(params: {
+    ioc_type?: string;
+    threat_actor?: string;
+    malware_family?: string;
+    feed_id?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    iocs: MISPIoC[];
+    total: number;
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  }> {
+    const response = await api.get('/cti/misp/iocs', { params });
     return response.data;
   }
 }

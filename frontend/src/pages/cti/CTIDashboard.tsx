@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Target, AlertCircle, Loader2, Shield, Brain, Database } from 'lucide-react';
+import { Target, AlertCircle, Loader2, Shield, Brain, Database, Search, List } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSettingsStore } from '@stores/settingsStore';
 import ActorsList from '../../components/cti/ActorsList';
@@ -86,7 +86,7 @@ const CTIDashboard: React.FC = () => {
         </p>
 
         {/* Navigation Cards */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* MISP Feeds Card */}
           <button
             onClick={() => navigate('/cti/feeds')}
@@ -140,6 +140,62 @@ const CTIDashboard: React.FC = () => {
             </div>
             <p className="text-sm" style={{ color: currentColors.text.secondary }}>
               Enriqueça IOCs com LLM e threat intelligence. MITRE ATT&CK mapping, detection methods, e análise contextual.
+            </p>
+          </button>
+
+          {/* IOC Search Card */}
+          <button
+            onClick={() => navigate('/cti/search')}
+            className="p-4 rounded-lg border-2 text-left hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.primary,
+              borderColor: currentColors.border.default,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#10b981';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = currentColors.border.default;
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <Search size={24} style={{ color: '#10b981' }} />
+              <h3 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+                IOC Search
+              </h3>
+            </div>
+            <p className="text-sm" style={{ color: currentColors.text.secondary }}>
+              Busque um IOC específico (IP, domain, URL, hash) no MISP e OTX.
+            </p>
+          </button>
+
+          {/* IOC Browser Card - NEW */}
+          <button
+            onClick={() => navigate('/cti/iocs')}
+            className="p-4 rounded-lg border-2 text-left hover:shadow-lg transition-all"
+            style={{
+              backgroundColor: currentColors.bg.primary,
+              borderColor: currentColors.border.default,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#f59e0b';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = currentColors.border.default;
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <List size={24} style={{ color: '#f59e0b' }} />
+              <h3 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+                IOC Browser
+              </h3>
+            </div>
+            <p className="text-sm" style={{ color: currentColors.text.secondary }}>
+              Navegue pelos IOCs salvos, filtrados por tipo (IP, domain, URL, hash).
             </p>
           </button>
         </div>

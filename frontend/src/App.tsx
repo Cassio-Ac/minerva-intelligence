@@ -19,6 +19,8 @@ import TelegramConversation from '@pages/TelegramConversation'
 import CTIDashboard from '@pages/cti/CTIDashboard'
 import MISPFeedsPage from '@pages/cti/MISPFeedsPage'
 import IOCEnrichmentPage from '@pages/cti/IOCEnrichmentPage'
+import IOCSearchPage from '@pages/cti/IOCSearchPage'
+import IOCBrowserPage from '@pages/cti/IOCBrowserPage'
 import { Header } from './components/Header'
 import { useDashboardStore } from '@stores/dashboardStore'
 import { useSettingsStore } from '@stores/settingsStore'
@@ -132,6 +134,8 @@ function App() {
         <Route path="/cti" element={<ProtectedRoute><CTIDashboard /></ProtectedRoute>} />
         <Route path="/cti/feeds" element={<ProtectedRoute><MISPFeedsPage /></ProtectedRoute>} />
         <Route path="/cti/enrichment" element={<ProtectedRoute><IOCEnrichmentPage /></ProtectedRoute>} />
+        <Route path="/cti/search" element={<ProtectedRoute><IOCSearchPage /></ProtectedRoute>} />
+        <Route path="/cti/iocs" element={<ProtectedRoute><IOCBrowserPage /></ProtectedRoute>} />
 
         {/* Profile Page */}
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />

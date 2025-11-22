@@ -19,7 +19,7 @@ import iocEnrichmentService, { EnrichedIOC, EnrichFromFeedResponse } from '../..
 const IOCEnrichmentPage: React.FC = () => {
   const { currentColors } = useSettingsStore();
   const [selectedFeed, setSelectedFeed] = useState<string>('');
-  const [limit, setLimit] = useState<number>(3);
+  const [limit, setLimit] = useState<number>(10);
   const [loading, setLoading] = useState(false);
   const [enrichResult, setEnrichResult] = useState<EnrichFromFeedResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +91,7 @@ const IOCEnrichmentPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
+    <div className="h-screen overflow-y-auto p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
