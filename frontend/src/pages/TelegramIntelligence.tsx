@@ -12,6 +12,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@services/api';
 import { useSettingsStore } from '@stores/settingsStore';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import TelegramBlacklistManager from '@components/TelegramBlacklistManager';
 
 interface TelegramMessage {
   id: number;
@@ -97,6 +98,9 @@ const TelegramIntelligence: React.FC = () => {
   const [modalLoading, setModalLoading] = useState(false);
   const [contextSize, setContextSize] = useState({ before: 10, after: 10 });
   const [selectedMessage, setSelectedMessage] = useState<{ message_id: number; index_name: string; group_username?: string } | null>(null);
+
+  // Blacklist manager state
+  const [showBlacklistManager, setShowBlacklistManager] = useState(false);
 
   // Fetch groups
   const fetchGroups = useCallback(async () => {
@@ -487,9 +491,36 @@ const TelegramIntelligence: React.FC = () => {
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
-          <h3 style={{ margin: '0 0 15px 0', color: currentColors.text.primary }}>
-            Buscar Mensagens e Usuários
-          </h3>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '15px'
+          }}>
+            <h3 style={{ margin: '0', color: currentColors.text.primary }}>
+              Buscar Mensagens e Usuários
+            </h3>
+            <button
+              onClick={() => setShowBlacklistManager(true)}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: currentColors.bg.tertiary,
+                border: `1px solid ${currentColors.border.default}`,
+                borderRadius: '8px',
+                color: currentColors.text.primary,
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              title="Manage message filters"
+            >
+              <span>🚫</span>
+              <span>Filtros</span>
+            </button>
+          </div>
 
           {/* Search Controls */}
           <div style={{
@@ -858,6 +889,11 @@ const TelegramIntelligence: React.FC = () => {
             )}
           </div>
         </div>
+      )}
+
+      {/* Blacklist Manager Modal */}
+      {showBlacklistManager && (
+        <TelegramBlacklistManager onClose={() => setShowBlacklistManager(false)} />
       )}
     </div>
   );

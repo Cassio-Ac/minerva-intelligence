@@ -4,9 +4,9 @@ Async SQLAlchemy para metadados do sistema (dashboards, conversas, etc.)
 """
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
-from sqlalchemy import text
-from typing import AsyncGenerator
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from typing import AsyncGenerator, Generator
 import logging
 import os
 
@@ -36,6 +36,29 @@ AsyncSessionLocal = async_sessionmaker(
     autoflush=False,
 )
 
+# Create sync engine (for specific use cases that need synchronous access)
+# Only create if psycopg2 is installed (optional dependency)
+try:
+    SYNC_DATABASE_URL = DATABASE_URL.replace("+asyncpg", "")  # Remove async driver
+    sync_engine = create_engine(
+        SYNC_DATABASE_URL,
+        echo=False,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+    )
+
+    # Create sync session factory
+    SyncSessionLocal = sessionmaker(
+        bind=sync_engine,
+        autocommit=False,
+        autoflush=False,
+    )
+except ImportError:
+    logger.warning("⚠️ psycopg2 not installed, sync database access unavailable")
+    sync_engine = None
+    SyncSessionLocal = None
+
 # Base class para models
 Base = declarative_base()
 
@@ -59,6 +82,29 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             raise
         finally:
             await session.close()
+
+
+def get_sync_db() -> Generator[Session, None, None]:
+    """
+    Dependency para obter sessão síncrona do banco
+    Use apenas quando absolutamente necessário (ex: em contextos síncronos)
+
+    Usage:
+        db = next(get_sync_db())
+        items = db.query(Item).all()
+    """
+    if SyncSessionLocal is None:
+        raise RuntimeError("Sync database access not available (psycopg2 not installed)")
+
+    session = SyncSessionLocal()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 async def init_db():

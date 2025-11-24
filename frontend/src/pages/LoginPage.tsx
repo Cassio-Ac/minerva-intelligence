@@ -32,21 +32,8 @@ export const LoginPage: React.FC = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  // Fetch SSO providers
-  useEffect(() => {
-    const fetchProviders = async () => {
-      try {
-        const response = await fetch(`${API_URL}/auth/sso/providers`);
-        if (response.ok) {
-          const data = await response.json();
-          setSsoProviders(data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch SSO providers:', error);
-      }
-    };
-    fetchProviders();
-  }, []);
+  // SSO not used in this project (Intelligence Platform)
+  // SSO is only available in Dashboard AI project
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

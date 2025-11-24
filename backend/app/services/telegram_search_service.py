@@ -6,8 +6,12 @@ Serviço para busca e análise de mensagens do Telegram indexadas no Elasticsear
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import logging
+import re
 from app.services.elasticsearch_service import get_es_service
 from app.services.es_client_factory import ESClientFactory
+from app.db.database import AsyncSessionLocal
+from app.models.telegram_blacklist import TelegramMessageBlacklist
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +51,72 @@ async def get_group_title_from_info(es, group_username: str) -> Optional[str]:
     except Exception as e:
         logger.warning(f"⚠️ Could not fetch group title from telegram_info: {e}")
         return None
+
+
+async def get_active_blacklist_patterns() -> List[Dict[str, Any]]:
+    """
+    Retrieve all active blacklist patterns from database
+
+    Returns:
+        List of active blacklist patterns with their settings
+    """
+    try:
+        async with AsyncSessionLocal() as session:
+            stmt = select(TelegramMessageBlacklist).where(
+                TelegramMessageBlacklist.is_active == True
+            )
+            result = await session.execute(stmt)
+            patterns = result.scalars().all()
+
+            return [
+                {
+                    "pattern": p.pattern,
+                    "is_regex": p.is_regex,
+                    "case_sensitive": p.case_sensitive
+                }
+                for p in patterns
+            ]
+    except Exception as e:
+        logger.error(f"❌ Error loading blacklist patterns: {e}")
+        return []
+
+
+def message_matches_blacklist(message: str, blacklist_patterns: List[Dict[str, Any]]) -> bool:
+    """
+    Check if a message matches any blacklist pattern
+
+    Args:
+        message: The message text to check
+        blacklist_patterns: List of blacklist patterns to check against
+
+    Returns:
+        True if message matches any blacklist pattern, False otherwise
+    """
+    if not message or not blacklist_patterns:
+        return False
+
+    for pattern_obj in blacklist_patterns:
+        pattern = pattern_obj["pattern"]
+        is_regex = pattern_obj["is_regex"]
+        case_sensitive = pattern_obj["case_sensitive"]
+
+        try:
+            if is_regex:
+                # Use regex matching
+                flags = 0 if case_sensitive else re.IGNORECASE
+                if re.search(pattern, message, flags=flags):
+                    return True
+            else:
+                # Simple substring matching
+                search_message = message if case_sensitive else message.lower()
+                search_pattern = pattern if case_sensitive else pattern.lower()
+                if search_pattern in search_message:
+                    return True
+        except re.error as e:
+            logger.warning(f"⚠️ Invalid regex pattern '{pattern}': {e}")
+            continue
+
+    return False
 
 
 class TelegramSearchService:
@@ -119,6 +189,23 @@ class TelegramSearchService:
 
             hits = response['hits']['hits']
             total = response['hits']['total']['value']
+
+            # Apply blacklist filtering
+            blacklist_patterns = await get_active_blacklist_patterns()
+            if blacklist_patterns:
+                filtered_hits = []
+                filtered_count = 0
+
+                for hit in hits:
+                    message_text = hit['_source'].get('message', '')
+                    if not message_matches_blacklist(message_text, blacklist_patterns):
+                        filtered_hits.append(hit)
+                    else:
+                        filtered_count += 1
+
+                logger.info(f"🚫 Filtered out {filtered_count} messages matching blacklist patterns")
+                hits = filtered_hits
+                total = len(filtered_hits)
 
             return {
                 "total": total,

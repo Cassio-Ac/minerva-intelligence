@@ -1,195 +1,82 @@
-# 🔌 Configuração de Portas - Minerva Intelligence Platform
+# Configuração de Portas - Intelligence Platform
 
-**Data**: 2025-11-21
-**Última atualização**: 2025-11-21
+## ⚠️ PORTAS OCUPADAS - NÃO USAR
 
----
+Estas portas são usadas pelo **Dashboard AI** (projeto separado) e **NÃO devem ser usadas** neste projeto:
 
-## ⚠️ IMPORTANTE: NÃO MUDE AS PORTAS SEM LER ESTE DOCUMENTO
+- **5173** - Frontend Vite (Dashboard AI)
+- **8000** - Backend FastAPI (Dashboard AI)
+- **5432** - PostgreSQL (Dashboard AI)
+- **6379** - Redis (Dashboard AI)
 
----
+## ✅ Portas Usadas - Intelligence Platform
 
-## 📋 Padrão de Portas do Projeto
+Este projeto usa as seguintes portas:
 
-### MINERVA (intelligence-platform)
+### Frontend
+- **5180** - Vite Dev Server (React)
+  - Configurado em: `frontend/vite.config.ts`
+  - Variável: `VITE_API_URL=http://localhost:8002`
 
-```
-Backend API:    http://localhost:8001
-Frontend:       http://localhost:5180
-API Docs:       http://localhost:8001/docs
-PostgreSQL:     localhost:5432 (Docker)
-Redis:          localhost:6379 (Docker)
-```
+### Backend
+- **8002** - FastAPI Server
+  - Configurado em: `backend/app/core/config.py`
+  - Comando: `uvicorn app.main:app --host 0.0.0.0 --port 8002`
 
-### DASHBOARD AI (projeto separado)
+### Infraestrutura (Docker)
+- **5433** - PostgreSQL (mapeado de 5432 interno)
+  - Container: `intelligence-platform-postgres`
+  - Arquivo: `docker-compose-infra.yml`
+  - Database: `intelligence_platform`
+  - User: `intelligence_user`
 
-```
-Backend API:    http://localhost:8000
-```
+- **6380** - Redis (mapeado de 6379 interno)
+  - Container: `intelligence-platform-redis`
+  - Arquivo: `docker-compose-infra.yml`
 
----
+### Elasticsearch
+- **9200** - Elasticsearch HTTP
+- **9300** - Elasticsearch Transport
 
-## 🚫 REGRA DE OURO
+## Diferenças entre Projetos
 
-```
-Porta 8000 = Dashboard AI
-Porta 8001 = Minerva
-```
+### Intelligence Platform (este projeto)
+- Backend: porta **8002**
+- PostgreSQL: porta **5433**
+- Redis: porta **6380**
+- Frontend: porta **5180**
+- **NÃO tem SSO**
 
-**NUNCA** use porta 8000 no Minerva!
+### Dashboard AI (projeto separado)
+- Backend: porta **8000**
+- PostgreSQL: porta **5432**
+- Redis: porta **6379**
+- Frontend: porta **5173**
+- **TEM SSO** (Entra ID/LDAP)
 
----
+## Como Iniciar o Projeto
 
-## 📝 Arquivos de Configuração
-
-### 1. Backend
-
-**Arquivo**: `backend/app/core/config.py`
-```python
-PORT: int = 8001  # ✅ CORRETO
-```
-
-**Arquivo**: `start-dev.sh`
+### 1. Infraestrutura (Docker)
 ```bash
-uvicorn app.main:socket_app --host 0.0.0.0 --port 8001 --reload  # ✅ CORRETO
+docker compose -f docker-compose-infra.yml up -d
 ```
 
-### 2. Frontend
-
-**Arquivo**: `frontend/.env` (não commitado)
+### 2. Backend
 ```bash
-VITE_API_URL=http://localhost:8001  # ✅ CORRETO
+cd backend
+PYTHONPATH=$PWD venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
 ```
 
-**Fallback em código** (quando .env não existe):
-```typescript
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-```
-
-### 3. CORS
-
-**Arquivo**: `backend/app/core/config.py`
-```python
-CORS_ORIGINS: List[str] = [
-    "http://localhost:5174",  # Vite dev (alternativa)
-    "http://localhost:5180",  # Frontend Minerva
-    "http://localhost:3000"   # Desenvolvimento
-]
-```
-
----
-
-## ✅ Checklist de Verificação
-
-Antes de iniciar o projeto, verifique:
-
-- [ ] Backend configurado para porta **8001**
-- [ ] Frontend `.env` com **VITE_API_URL=http://localhost:8001**
-- [ ] `start-dev.sh` usando **--port 8001**
-- [ ] `config.py` com **PORT: int = 8001**
-- [ ] CORS inclui **http://localhost:5180**
-- [ ] Porta 8000 **NÃO** está em uso pelo Minerva
-
----
-
-## 🔍 Como Verificar se Está Correto
-
-### 1. Verificar Backend
+### 3. Frontend
 ```bash
-# Deve retornar "Minerva"
-curl -s http://localhost:8001/docs | grep -o "Minerva"
-
-# NÃO deve retornar nada (porta livre ou Dashboard AI)
-curl -s http://localhost:8000/docs | grep -o "Minerva"
+cd frontend
+npm run dev
+# Abre em http://localhost:5180
 ```
 
-### 2. Verificar Frontend
-```bash
-# Verificar .env
-cat frontend/.env
-# Deve mostrar: VITE_API_URL=http://localhost:8001
+## Configuração de CORS
 
-# Verificar porta frontend
-lsof -ti:5180
-# Deve retornar PID do Vite
-```
-
-### 3. Verificar Processos
-```bash
-# Ver quem está usando as portas
-lsof -i:8000  # Dashboard AI ou livre
-lsof -i:8001  # Minerva backend
-lsof -i:5180  # Minerva frontend
-```
-
----
-
-## 🐛 Troubleshooting
-
-### Problema: "CORS error" no frontend
-
-**Causa**: Frontend rodando em porta não autorizada no CORS
-
-**Solução**:
-1. Verificar porta do frontend: `lsof -ti:5180`
-2. Se estiver em outra porta (ex: 5181), adicionar em `CORS_ORIGINS`
-3. Reiniciar backend
-
-### Problema: "Connection refused" ao acessar API
-
-**Causa**: Backend não está rodando na porta esperada
-
-**Solução**:
-1. Verificar se backend está em 8001: `curl http://localhost:8001/docs`
-2. Se não, parar tudo: `./stop-dev.sh`
-3. Verificar configurações neste documento
-4. Iniciar: `./start-dev.sh`
-
-### Problema: "Address already in use" ao iniciar
-
-**Causa**: Porta 8001 ocupada
-
-**Solução**:
-1. Verificar quem está usando: `lsof -ti:8001 | xargs ps -p`
-2. Se for Docker Minerva: porta certa, mas processo duplicado
-3. Se for outro processo: matar com `kill <PID>`
-4. Reiniciar: `./start-dev.sh`
-
----
-
-## 📚 Referências
-
-- **README.md**: Linhas 23-24 (tabela de portas)
-- **README.md**: Linha 291 (nota sobre porta vs Dashboard AI)
-- **start-dev.sh**: Linha 131 (comando uvicorn)
-- **config.py**: Linha 21 (PORT config)
-
----
-
-## 🔄 Histórico de Mudanças
-
-| Data | Mudança | Motivo |
-|------|---------|--------|
-| 2025-11-21 | Criação deste documento | Documentar padrão após confusão com portas |
-| 2025-11-21 | Correção: 8000 → 8001 | `start-dev.sh` estava usando porta errada |
-| 2025-11-21 | Correção: 8000 → 8001 | `config.py` estava com PORT = 8000 |
-
----
-
-## ⚡ Quick Reference
-
-```bash
-# Iniciar tudo (porta 8001)
-./start-dev.sh
-
-# Parar tudo
-./stop-dev.sh
-
-# Verificar se está correto
-curl http://localhost:8001/docs | grep Minerva  # ✅ Deve funcionar
-curl http://localhost:8000/docs | grep Minerva  # ❌ NÃO deve funcionar
-```
-
----
-
-**Mantenha este documento atualizado sempre que houver mudanças nas portas!**
+O backend está configurado para aceitar requisições de:
+- `http://localhost:5174`
+- `http://localhost:5180` ✅ (usado por este projeto)
+- `http://localhost:3000`
