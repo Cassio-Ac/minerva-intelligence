@@ -113,9 +113,10 @@ async def enrich_actors(
             logger.info(f"🔨 Enriching actor: {actor_name} (force={request.force})")
 
             # Check cache first (unless force=True)
+            # Use a very long max_age to avoid cache expiration (30 days)
             from_cache = False
             if not request.force:
-                cached = await cache_service.get_cached_techniques(actor_name)
+                cached = await cache_service.get_cached_techniques(actor_name, max_age_hours=720)
                 if cached is not None:
                     results.append(EnrichActorResponse(
                         actor=actor_name,

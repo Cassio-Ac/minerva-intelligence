@@ -42,9 +42,8 @@ class EnrichmentCacheService:
     def __init__(self):
         self.enrichment_service = EnrichmentService()
         self.es_client: Optional[AsyncElasticsearch] = None
-        # Import MISP Galaxy service
-        from .misp_galaxy_service import get_misp_galaxy_service
-        self.misp_service = get_misp_galaxy_service()
+        # MISP Galaxy service not used for now (enrichment not fully implemented)
+        self.misp_service = None
 
     async def _get_es_client(self):
         """Get Elasticsearch client"""
@@ -184,26 +183,9 @@ class EnrichmentCacheService:
                 "aliases": aliases or []
             }
 
-            # Enrich with MISP Galaxy data
-            misp_data = self.misp_service.enrich_actor(actor_name)
-
-            if misp_data.get("found"):
-                doc.update({
-                    "misp_found": True,
-                    "country": misp_data.get("country"),
-                    "state_sponsor": misp_data.get("state_sponsor"),
-                    "military_unit": misp_data.get("military_unit"),
-                    "targeted_countries": misp_data.get("targeted_countries", []),
-                    "targeted_sectors": misp_data.get("targeted_sectors", []),
-                    "incident_type": misp_data.get("incident_type"),
-                    "attribution_confidence": misp_data.get("attribution_confidence"),
-                    "additional_aliases": misp_data.get("additional_aliases", []),
-                    "misp_refs": misp_data.get("misp_refs", []),
-                    "description": misp_data.get("description", "")
-                })
-                logger.info(f"✅ Added MISP Galaxy data: {misp_data.get('country', 'N/A')} | {misp_data.get('state_sponsor', 'N/A')}")
-            else:
-                doc["misp_found"] = False
+            # TODO: Enrich with MISP Galaxy data (method not yet implemented)
+            # For now, skip MISP enrichment to avoid errors
+            doc["misp_found"] = False
 
             # Upsert (update or insert)
             await es.index(
