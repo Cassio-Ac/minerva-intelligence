@@ -63,3 +63,6 @@ logs/
 htmlcov/
 .tox/
 apresentacao/
+
+# Claude Code context
+.claude/
