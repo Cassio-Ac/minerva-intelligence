@@ -70,7 +70,7 @@ const CTIDashboard: React.FC = () => {
 
   return (
     <div
-      className="min-h-screen p-6"
+      className="h-full overflow-y-auto p-6"
       style={{ backgroundColor: currentColors.bg.secondary }}
     >
       {/* Header */}

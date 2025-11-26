@@ -88,7 +88,7 @@ const MISPFeedsPage: React.FC = () => {
   };
 
   return (
-    <div className="h-screen overflow-y-auto p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
+    <div className="h-full overflow-y-auto p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">

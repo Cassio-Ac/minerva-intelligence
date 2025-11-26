@@ -76,7 +76,7 @@ const TelegramConversation: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col" style={{ backgroundColor: currentColors.bg.secondary }}>
+    <div className="h-full flex flex-col" style={{ backgroundColor: currentColors.bg.secondary }}>
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="container mx-auto px-4 py-6 flex-shrink-0">
           {/* Header */}

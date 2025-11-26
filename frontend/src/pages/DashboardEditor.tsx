@@ -403,7 +403,7 @@ export const DashboardEditor: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: currentColors.bg.secondary }}>
+    <div className="h-full flex flex-col overflow-hidden" style={{ backgroundColor: currentColors.bg.secondary }}>
       {/* Header */}
       <header className="shadow-sm border-b flex-shrink-0 overflow-visible" style={{
         backgroundColor: currentColors.bg.primary,

@@ -405,7 +405,7 @@ export const ChatPage: React.FC = () => {
   }, [selectedDashboardId, currentConversation?.index, selectedIndex, timeRange]);
 
   return (
-    <div className="h-screen flex flex-col overflow-x-hidden" style={{ backgroundColor: currentColors.bg.secondary }}>
+    <div className="h-full flex flex-col overflow-x-hidden" style={{ backgroundColor: currentColors.bg.secondary }}>
       {/* Header */}
       <header className="border-b flex-shrink-0" style={{
         backgroundColor: currentColors.bg.primary,

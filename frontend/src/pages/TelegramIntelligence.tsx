@@ -92,6 +92,12 @@ const TelegramIntelligence: React.FC = () => {
   const [periodDays, setPeriodDays] = useState<number | null>(null);
   const [groupSearchQuery, setGroupSearchQuery] = useState('');
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(50);
+  const [totalResults, setTotalResults] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [modalContext, setModalContext] = useState<ConversationContext | null>(null);
@@ -101,6 +107,9 @@ const TelegramIntelligence: React.FC = () => {
 
   // Blacklist manager state
   const [showBlacklistManager, setShowBlacklistManager] = useState(false);
+
+  // Timeline visibility state
+  const [showTimeline, setShowTimeline] = useState(true);
 
   // Fetch groups
   const fetchGroups = useCallback(async () => {
@@ -147,8 +156,8 @@ const TelegramIntelligence: React.FC = () => {
     return () => clearTimeout(timer);
   }, [fetchGroups, fetchStats, fetchTimeline]);
 
-  // Search messages
-  const handleSearch = async () => {
+  // Search messages with pagination
+  const handleSearch = async (page: number = 1) => {
     if (!searchQuery.trim()) return;
 
     setLoading(true);
@@ -157,27 +166,52 @@ const TelegramIntelligence: React.FC = () => {
         const response = await api.post<{
           total: number;
           messages: TelegramMessage[];
+          page: number;
+          page_size: number;
+          has_more: boolean;
         }>('/telegram/search/messages', {
           text: searchQuery,
           is_exact_search: isExactSearch,
-          max_results: 500
+          page: page,
+          page_size: pageSize
         });
         setMessages(response.data.messages);
+        setTotalResults(response.data.total);
+        setHasMore(response.data.has_more);
+        setCurrentPage(page);
       } else {
         const response = await api.post<{
           total: number;
           messages: TelegramMessage[];
+          page: number;
+          page_size: number;
+          has_more: boolean;
         }>('/telegram/search/users', {
           search_term: searchQuery,
-          max_results: 500
+          page: page,
+          page_size: pageSize
         });
         setMessages(response.data.messages);
+        setTotalResults(response.data.total);
+        setHasMore(response.data.has_more);
+        setCurrentPage(page);
       }
     } catch (error) {
       console.error('Error searching:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    handleSearch(newPage);
+  };
+
+  // Reset pagination when search query changes
+  const handleNewSearch = () => {
+    setCurrentPage(1);
+    handleSearch(1);
   };
 
   // Handle message click to show context
@@ -313,90 +347,127 @@ const TelegramIntelligence: React.FC = () => {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      height: '100%',
       backgroundColor: currentColors.bg.primary,
       color: currentColors.text.primary,
-      padding: '20px'
+      padding: '12px',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      boxSizing: 'border-box'
     }}>
-      {/* Timeline Chart - Top */}
+      {/* Timeline Chart - Top (Collapsible) */}
       <div style={{
         backgroundColor: currentColors.bg.secondary,
-        borderRadius: '12px',
-        padding: '20px',
-        marginBottom: '20px',
-        border: `1px solid ${currentColors.border.default}`
+        borderRadius: '8px',
+        padding: showTimeline ? '12px' : '8px 12px',
+        marginBottom: '12px',
+        border: `1px solid ${currentColors.border.default}`,
+        flexShrink: 0
       }}>
-        <h3 style={{ margin: '0 0 15px 0', color: currentColors.text.primary }}>
-          Volume de Mensagens (Últimos 30 Dias)
-        </h3>
-        {isPageMounted && timeline && timelineChartData.length > 0 ? (
-          <div style={{ height: '200px', minHeight: '200px', width: '100%', minWidth: '300px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={timelineChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={currentColors.border.default} />
-                <XAxis
-                  dataKey="date"
-                  stroke={currentColors.text.secondary}
-                  tick={{ fill: currentColors.text.secondary, fontSize: 12 }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis
-                  stroke={currentColors.text.secondary}
-                  tick={{ fill: currentColors.text.secondary, fontSize: 12 }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: currentColors.bg.secondary,
-                    border: `1px solid ${currentColors.border.default}`,
-                    borderRadius: '8px',
-                    color: currentColors.text.primary
-                  }}
-                  labelStyle={{ color: currentColors.text.primary }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="count"
-                  stroke={currentColors.accent.primary}
-                  strokeWidth={2}
-                  fill={`${currentColors.accent.primary}33`}
-                  fillOpacity={1}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <div style={{
-            height: '200px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: currentColors.text.secondary
-          }}>
-            {!timeline ? 'Carregando timeline...' : 'Sem dados para exibir'}
-          </div>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: showTimeline ? '8px' : '0'
+        }}>
+          <h3 style={{ margin: '0', color: currentColors.text.primary, fontSize: '14px' }}>
+            Volume de Mensagens (30 Dias)
+          </h3>
+          <button
+            onClick={() => setShowTimeline(!showTimeline)}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: currentColors.bg.tertiary,
+              border: `1px solid ${currentColors.border.default}`,
+              borderRadius: '6px',
+              color: currentColors.text.secondary,
+              cursor: 'pointer',
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            {showTimeline ? '▲ Ocultar' : '▼ Mostrar'}
+          </button>
+        </div>
+        {showTimeline && (
+          <>
+            {isPageMounted && timeline && timelineChartData.length > 0 ? (
+              <div style={{ height: '150px', minHeight: '150px', width: '100%', minWidth: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={timelineChartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={currentColors.border.default} />
+                    <XAxis
+                      dataKey="date"
+                      stroke={currentColors.text.secondary}
+                      tick={{ fill: currentColors.text.secondary, fontSize: 12 }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
+                    <YAxis
+                      stroke={currentColors.text.secondary}
+                      tick={{ fill: currentColors.text.secondary, fontSize: 12 }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: currentColors.bg.secondary,
+                        border: `1px solid ${currentColors.border.default}`,
+                        borderRadius: '8px',
+                        color: currentColors.text.primary
+                      }}
+                      labelStyle={{ color: currentColors.text.primary }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="count"
+                      stroke={currentColors.accent.primary}
+                      strokeWidth={2}
+                      fill={`${currentColors.accent.primary}33`}
+                      fillOpacity={1}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div style={{
+                height: '150px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: currentColors.text.secondary
+              }}>
+                {!timeline ? 'Carregando timeline...' : 'Sem dados para exibir'}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Main Layout - 3 Columns */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '280px 1fr 320px',
-        gap: '20px',
-        height: 'calc(100vh - 320px)'
+        gridTemplateColumns: '250px 1fr 280px',
+        gap: '12px',
+        flex: 1,
+        minHeight: 0,
+        maxHeight: '100%',
+        overflow: 'hidden'
       }}>
         {/* Left Sidebar - Groups */}
         <div style={{
           backgroundColor: currentColors.bg.secondary,
-          borderRadius: '12px',
-          padding: '20px',
+          borderRadius: '8px',
+          padding: '12px',
           border: `1px solid ${currentColors.border.default}`,
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          maxHeight: '100%'
         }}>
-          <h3 style={{ margin: '0 0 15px 0', color: currentColors.text.primary }}>
+          <h3 style={{ margin: '0 0 10px 0', color: currentColors.text.primary, fontSize: '14px' }}>
             Grupos ({filteredGroups.length}/{groups.length})
           </h3>
 
@@ -408,13 +479,14 @@ const TelegramIntelligence: React.FC = () => {
             onChange={(e) => setGroupSearchQuery(e.target.value)}
             style={{
               width: '100%',
-              padding: '10px',
-              marginBottom: '15px',
+              padding: '8px',
+              marginBottom: '10px',
               backgroundColor: currentColors.bg.tertiary,
               border: `1px solid ${currentColors.border.default}`,
-              borderRadius: '8px',
+              borderRadius: '6px',
               color: currentColors.text.primary,
-              fontSize: '14px'
+              fontSize: '13px',
+              boxSizing: 'border-box'
             }}
           />
 
@@ -484,129 +556,135 @@ const TelegramIntelligence: React.FC = () => {
         {/* Center - Search and Results */}
         <div style={{
           backgroundColor: currentColors.bg.secondary,
-          borderRadius: '12px',
-          padding: '20px',
+          borderRadius: '8px',
           border: `1px solid ${currentColors.border.default}`,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
+          display: 'grid',
+          gridTemplateRows: 'auto 1fr auto',
+          overflow: 'hidden',
+          maxHeight: '100%'
         }}>
+          {/* Header - Fixed */}
           <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '15px'
+            padding: '15px 15px 10px 15px',
+            borderBottom: `1px solid ${currentColors.border.default}`
           }}>
-            <h3 style={{ margin: '0', color: currentColors.text.primary }}>
-              Buscar Mensagens e Usuários
-            </h3>
-            <button
-              onClick={() => setShowBlacklistManager(true)}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: currentColors.bg.tertiary,
-                border: `1px solid ${currentColors.border.default}`,
-                borderRadius: '8px',
-                color: currentColors.text.primary,
-                cursor: 'pointer',
-                fontSize: '13px',
-                fontWeight: 500,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-              title="Manage message filters"
-            >
-              <span>🚫</span>
-              <span>Filtros</span>
-            </button>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '10px'
+            }}>
+              <h3 style={{ margin: '0', color: currentColors.text.primary, fontSize: '15px' }}>
+                Buscar Mensagens e Usuários
+              </h3>
+              <button
+                onClick={() => setShowBlacklistManager(true)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: currentColors.bg.tertiary,
+                  border: `1px solid ${currentColors.border.default}`,
+                  borderRadius: '8px',
+                  color: currentColors.text.primary,
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                title="Manage message filters"
+              >
+                <span>🚫</span>
+                <span>Filtros</span>
+              </button>
+            </div>
+
+            {/* Search Controls */}
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '10px',
+              flexWrap: 'wrap'
+            }}>
+              <select
+                value={searchType}
+                onChange={(e) => setSearchType(e.target.value as 'message' | 'user')}
+                style={{
+                  padding: '10px',
+                  backgroundColor: currentColors.bg.tertiary,
+                  border: `1px solid ${currentColors.border.default}`,
+                  borderRadius: '8px',
+                  color: currentColors.text.primary
+                }}
+              >
+                <option value="message">Por Mensagem</option>
+                <option value="user">Por Usuário</option>
+              </select>
+
+              {searchType === 'message' && (
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px',
+                  backgroundColor: currentColors.bg.tertiary,
+                  border: `1px solid ${currentColors.border.default}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={isExactSearch}
+                    onChange={(e) => setIsExactSearch(e.target.checked)}
+                  />
+                  <span style={{ fontSize: '14px', color: currentColors.text.primary }}>
+                    Busca Exata
+                  </span>
+                </label>
+              )}
+            </div>
+
+            {/* Search Input */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                placeholder={searchType === 'message' ? 'Digite o texto da mensagem...' : 'Digite user_id, username ou nome...'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleNewSearch()}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  backgroundColor: currentColors.bg.tertiary,
+                  border: `1px solid ${currentColors.border.default}`,
+                  borderRadius: '8px',
+                  color: currentColors.text.primary,
+                  fontSize: '14px'
+                }}
+              />
+              <button
+                onClick={handleNewSearch}
+                disabled={loading}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: currentColors.accent.primary,
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontWeight: '500',
+                  opacity: loading ? 0.6 : 1
+                }}
+              >
+                {loading ? 'Buscando...' : 'Buscar'}
+              </button>
+            </div>
           </div>
 
-          {/* Search Controls */}
+          {/* Results - Scrollable */}
           <div style={{
-            display: 'flex',
-            gap: '10px',
-            marginBottom: '15px',
-            flexWrap: 'wrap'
-          }}>
-            <select
-              value={searchType}
-              onChange={(e) => setSearchType(e.target.value as 'message' | 'user')}
-              style={{
-                padding: '10px',
-                backgroundColor: currentColors.bg.tertiary,
-                border: `1px solid ${currentColors.border.default}`,
-                borderRadius: '8px',
-                color: currentColors.text.primary
-              }}
-            >
-              <option value="message">Por Mensagem</option>
-              <option value="user">Por Usuário</option>
-            </select>
-
-            {searchType === 'message' && (
-              <label style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px',
-                backgroundColor: currentColors.bg.tertiary,
-                border: `1px solid ${currentColors.border.default}`,
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={isExactSearch}
-                  onChange={(e) => setIsExactSearch(e.target.checked)}
-                />
-                <span style={{ fontSize: '14px', color: currentColors.text.primary }}>
-                  Busca Exata
-                </span>
-              </label>
-            )}
-          </div>
-
-          {/* Search Input */}
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-            <input
-              type="text"
-              placeholder={searchType === 'message' ? 'Digite o texto da mensagem...' : 'Digite user_id, username ou nome...'}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              style={{
-                flex: 1,
-                padding: '10px',
-                backgroundColor: currentColors.bg.tertiary,
-                border: `1px solid ${currentColors.border.default}`,
-                borderRadius: '8px',
-                color: currentColors.text.primary,
-                fontSize: '14px'
-              }}
-            />
-            <button
-              onClick={handleSearch}
-              disabled={loading}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: currentColors.accent.primary,
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontWeight: '500',
-                opacity: loading ? 0.6 : 1
-              }}
-            >
-              {loading ? 'Buscando...' : 'Buscar'}
-            </button>
-          </div>
-
-          {/* Results */}
-          <div style={{
-            flex: 1,
             overflowY: 'auto',
+            padding: '10px 15px',
             display: 'flex',
             flexDirection: 'column',
             gap: '10px'
@@ -633,7 +711,8 @@ const TelegramIntelligence: React.FC = () => {
                   borderRadius: '8px',
                   cursor: 'pointer',
                   border: `1px solid ${currentColors.border.default}`,
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  flexShrink: 0
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = currentColors.bg.hover;
@@ -679,62 +758,125 @@ const TelegramIntelligence: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {/* Pagination Controls - Fixed at bottom */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px 15px',
+            borderTop: `1px solid ${currentColors.border.default}`,
+            backgroundColor: currentColors.bg.tertiary,
+            minHeight: '50px'
+          }}>
+            {messages.length > 0 ? (
+              <>
+                <span style={{
+                  fontSize: '13px',
+                  color: currentColors.text.secondary
+                }}>
+                  {messages.length} de ~{totalResults.toLocaleString('pt-BR')} (Página {currentPage})
+                </span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage <= 1 || loading}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: currentPage <= 1 ? currentColors.bg.secondary : currentColors.accent.primary,
+                      color: currentPage <= 1 ? currentColors.text.secondary : '#fff',
+                      border: `1px solid ${currentColors.border.default}`,
+                      borderRadius: '6px',
+                      cursor: currentPage <= 1 || loading ? 'not-allowed' : 'pointer',
+                      fontWeight: '500',
+                      fontSize: '13px',
+                      opacity: currentPage <= 1 ? 0.5 : 1
+                    }}
+                  >
+                    ← Anterior
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={!hasMore || loading}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: !hasMore ? currentColors.bg.secondary : currentColors.accent.primary,
+                      color: !hasMore ? currentColors.text.secondary : '#fff',
+                      border: `1px solid ${currentColors.border.default}`,
+                      borderRadius: '6px',
+                      cursor: !hasMore || loading ? 'not-allowed' : 'pointer',
+                      fontWeight: '500',
+                      fontSize: '13px',
+                      opacity: !hasMore ? 0.5 : 1
+                    }}
+                  >
+                    Próxima →
+                  </button>
+                </div>
+              </>
+            ) : (
+              <span style={{ fontSize: '13px', color: currentColors.text.secondary }}>
+                Faça uma busca para ver resultados
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Right Sidebar - Statistics */}
         <div style={{
           backgroundColor: currentColors.bg.secondary,
-          borderRadius: '12px',
-          padding: '20px',
+          borderRadius: '8px',
+          padding: '12px',
           border: `1px solid ${currentColors.border.default}`,
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          maxHeight: '100%'
         }}>
-          <h3 style={{ margin: '0 0 15px 0', color: currentColors.text.primary }}>
+          <h3 style={{ margin: '0 0 10px 0', color: currentColors.text.primary, fontSize: '14px' }}>
             Estatísticas
           </h3>
 
           {/* Stats Cards */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
             <div style={{
-              padding: '15px',
+              padding: '10px',
               backgroundColor: currentColors.bg.tertiary,
-              borderRadius: '8px',
+              borderRadius: '6px',
               border: `1px solid ${currentColors.border.default}`
             }}>
-              <div style={{ fontSize: '12px', color: currentColors.text.secondary, marginBottom: '5px' }}>
+              <div style={{ fontSize: '11px', color: currentColors.text.secondary, marginBottom: '3px' }}>
                 Total de Mensagens
               </div>
-              <div style={{ fontSize: '24px', fontWeight: '600', color: currentColors.accent.primary }}>
+              <div style={{ fontSize: '18px', fontWeight: '600', color: currentColors.accent.primary }}>
                 {stats?.total_mensagens.toLocaleString('pt-BR') || '0'}
               </div>
             </div>
 
             <div style={{
-              padding: '15px',
+              padding: '10px',
               backgroundColor: currentColors.bg.tertiary,
-              borderRadius: '8px',
+              borderRadius: '6px',
               border: `1px solid ${currentColors.border.default}`
             }}>
-              <div style={{ fontSize: '12px', color: currentColors.text.secondary, marginBottom: '5px' }}>
+              <div style={{ fontSize: '11px', color: currentColors.text.secondary, marginBottom: '3px' }}>
                 Grupos Monitorados
               </div>
-              <div style={{ fontSize: '24px', fontWeight: '600', color: currentColors.accent.success }}>
+              <div style={{ fontSize: '18px', fontWeight: '600', color: currentColors.accent.success }}>
                 {stats?.total_grupos.toLocaleString('pt-BR') || '0'}
               </div>
             </div>
 
             <div style={{
-              padding: '15px',
+              padding: '10px',
               backgroundColor: currentColors.bg.tertiary,
-              borderRadius: '8px',
+              borderRadius: '6px',
               border: `1px solid ${currentColors.border.default}`
             }}>
-              <div style={{ fontSize: '12px', color: currentColors.text.secondary, marginBottom: '5px' }}>
+              <div style={{ fontSize: '11px', color: currentColors.text.secondary, marginBottom: '3px' }}>
                 Usuários Pesquisáveis
               </div>
-              <div style={{ fontSize: '24px', fontWeight: '600', color: currentColors.accent.warning }}>
+              <div style={{ fontSize: '18px', fontWeight: '600', color: currentColors.accent.warning }}>
                 {stats?.total_usuarios.toLocaleString('pt-BR') || '0'}
               </div>
             </div>

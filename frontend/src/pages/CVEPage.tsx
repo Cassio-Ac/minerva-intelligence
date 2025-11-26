@@ -1,19 +1,17 @@
 /**
- * CVEPage - CVE Vulnerabilities Feed with Floating AI Chat
+ * CVEPage - CVE Vulnerabilities with Responsive Layout
  *
  * Features:
- * - CVE grid as main focus
- * - Timeline chart with daily CVE counts
- * - Filter bar with search, severity levels, sources, and date range
- * - Floating AI chat for CVE analysis
+ * - Collapsible timeline chart
+ * - Two-column layout (CVE list + Statistics)
+ * - Pagination support
+ * - Full-width responsive design
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@services/api';
 import { useSettingsStore } from '@stores/settingsStore';
-import CVETimeline from '../components/cve/CVETimeline';
-import CVEGrid from '../components/cve/CVEGrid';
-import CVEFilterBar from '../components/cve/CVEFilterBar';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import FloatingChat from '../components/rss/FloatingChat';
 
 interface CVEEntry {
@@ -48,21 +46,35 @@ const CVEPage: React.FC = () => {
   const [cves, setCVEs] = useState<CVEEntry[]>([]);
   const [stats, setStats] = useState<CVEStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [totalResults, setTotalResults] = useState(0);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSeverityLevels, setSelectedSeverityLevels] = useState<string[]>([]);
-  const [selectedSources, setSelectedSources] = useState<string[]>([]);
+  const [selectedSeverity, setSelectedSeverity] = useState<string>('');
   const [dateRange, setDateRange] = useState('7d');
 
-  // Fetch stats and CVEs
-  const fetchData = useCallback(async () => {
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [hasMore, setHasMore] = useState(false);
+
+  // UI state
+  const [showTimeline, setShowTimeline] = useState(true);
+
+  // Fetch stats
+  const fetchStats = useCallback(async () => {
+    try {
+      const response = await api.get<CVEStats>('/cves/stats');
+      setStats(response.data);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  }, []);
+
+  // Fetch CVEs with pagination
+  const fetchCVEs = useCallback(async (page: number = 1) => {
     setLoading(true);
     try {
-      // Fetch stats for timeline
-      const statsResponse = await api.get<CVEStats>('/cves/stats');
-      setStats(statsResponse.data);
-
       // Build date filter
       let dateFrom: Date | undefined;
       const now = new Date();
@@ -74,51 +86,62 @@ const CVEPage: React.FC = () => {
         dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       }
 
-      // Fetch CVEs with filters
-      const limit = dateRange === 'all' ? 1000 : 50;
+      const offset = (page - 1) * pageSize;
 
-      const cvesResponse = await api.post<{
+      const response = await api.post<{
         total: number;
         cves: CVEEntry[];
         facets?: any;
         took_ms: number;
-      }>(
-        '/cves/search',
-        {
-          query: searchQuery || undefined,
-          severity_levels: selectedSeverityLevels.length > 0 ? selectedSeverityLevels : undefined,
-          sources: selectedSources.length > 0 ? selectedSources : undefined,
-          date_from: dateFrom?.toISOString(),
-          limit,
-          offset: 0,
-          sort_by: 'date',
-          sort_order: 'desc',
-        }
-      );
+      }>('/cves/search', {
+        query: searchQuery || undefined,
+        severity_levels: selectedSeverity ? [selectedSeverity] : undefined,
+        date_from: dateFrom?.toISOString(),
+        limit: pageSize,
+        offset,
+        sort_by: 'date',
+        sort_order: 'desc',
+      });
 
-      setCVEs(cvesResponse.data.cves);
+      setCVEs(response.data.cves);
+      setTotalResults(response.data.total);
+      setHasMore(offset + response.data.cves.length < response.data.total);
+      setCurrentPage(page);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching CVEs:', error);
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedSeverityLevels, selectedSources, dateRange]);
+  }, [searchQuery, selectedSeverity, dateRange, pageSize]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchStats();
+  }, [fetchStats]);
+
+  useEffect(() => {
+    fetchCVEs(1);
+  }, [searchQuery, selectedSeverity, dateRange]);
+
+  // Handle search
+  const handleSearch = () => {
+    setCurrentPage(1);
+    fetchCVEs(1);
+  };
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    fetchCVEs(newPage);
+  };
 
   // Chat handler
   const handleSendMessage = async (message: string, context: Message[]): Promise<string> => {
     try {
       const response = await api.post<{ answer: string; context_used: number }>('/cves/chat', {
         query: message,
-        severity_level: selectedSeverityLevels.length === 1 ? selectedSeverityLevels[0] : undefined,
-        source: selectedSources.length === 1 ? selectedSources[0] : undefined,
+        severity_level: selectedSeverity || undefined,
         days: dateRange === '24h' ? 1 : dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 365,
         max_context: 10,
       });
-
       return response.data.answer;
     } catch (error) {
       console.error('Error sending chat message:', error);
@@ -126,154 +149,513 @@ const CVEPage: React.FC = () => {
     }
   };
 
-  // Get available severity levels and sources from stats
-  const availableSeverityLevels = stats
-    ? Object.keys(stats.cves_by_severity).filter(level => stats.cves_by_severity[level] > 0)
-    : [];
-
-  const availableSources = stats && stats.top_sources
-    ? stats.top_sources.map(source => source.name)
-    : [];
-
-  // Filter timeline data based on selected date range
-  const getFilteredTimeline = () => {
-    if (!stats || !stats.timeline.length) return [];
-
-    // If severity levels or sources are selected, we need to build timeline from filtered CVEs
-    if (selectedSeverityLevels.length > 0 || selectedSources.length > 0) {
-      // Group CVEs by date
-      const timelineMap = new Map<string, number>();
-
-      cves.forEach(cve => {
-        const date = new Date(cve.date).toISOString().split('T')[0];
-        timelineMap.set(date, (timelineMap.get(date) || 0) + 1);
-      });
-
-      // Convert to timeline array and sort by date
-      const timeline = Array.from(timelineMap.entries())
-        .map(([date, count]) => ({ date, count }))
-        .sort((a, b) => a.date.localeCompare(b.date));
-
-      return timeline;
+  // Get severity color
+  const getSeverityColor = (severity: string) => {
+    switch (severity?.toUpperCase()) {
+      case 'CRITICAL': return '#dc2626';
+      case 'HIGH': return '#f97316';
+      case 'MEDIUM': return '#eab308';
+      case 'LOW': return '#22c55e';
+      default: return currentColors.text.secondary;
     }
-
-    // Otherwise filter the global timeline by date range only
-    const now = new Date();
-    let cutoffDate: Date;
-
-    switch (dateRange) {
-      case '24h':
-        cutoffDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        break;
-      case '7d':
-        cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case '30d':
-        cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-      default: // 'all'
-        return stats.timeline;
-    }
-
-    return stats.timeline.filter(item => {
-      const itemDate = new Date(item.date);
-      return itemDate >= cutoffDate;
-    });
   };
 
+  // Timeline data
+  const timelineData = stats?.timeline || [];
+
   return (
-    <div className="h-screen flex flex-col" style={{ backgroundColor: currentColors.bg.secondary }}>
-      <div className="container mx-auto px-4 py-8 flex-shrink-0">
-        {/* Header with Timeline */}
-        <div className="mb-8">
-          <h1
-            className="text-3xl font-bold mb-6"
-            style={{ color: currentColors.text.primary }}
+    <div style={{
+      height: '100%',
+      backgroundColor: currentColors.bg.primary,
+      color: currentColors.text.primary,
+      padding: '12px',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      boxSizing: 'border-box'
+    }}>
+      {/* Timeline Chart - Top (Collapsible) */}
+      <div style={{
+        backgroundColor: currentColors.bg.secondary,
+        borderRadius: '8px',
+        padding: showTimeline ? '12px' : '8px 12px',
+        marginBottom: '12px',
+        border: `1px solid ${currentColors.border.default}`,
+        flexShrink: 0
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: showTimeline ? '8px' : '0'
+        }}>
+          <h3 style={{ margin: '0', color: currentColors.text.primary, fontSize: '14px' }}>
+            Timeline de CVEs (7 Dias)
+          </h3>
+          <button
+            onClick={() => setShowTimeline(!showTimeline)}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: currentColors.bg.tertiary,
+              border: `1px solid ${currentColors.border.default}`,
+              borderRadius: '6px',
+              color: currentColors.text.secondary,
+              cursor: 'pointer',
+              fontSize: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
           >
-            CVE Vulnerabilities
-          </h1>
-
-          {/* Stats Summary */}
-          {stats && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div
-                className="rounded-lg shadow p-4"
-                style={{ backgroundColor: currentColors.bg.primary }}
-              >
-                <div className="text-sm" style={{ color: currentColors.text.secondary }}>
-                  Total de CVEs
-                </div>
-                <div className="text-2xl font-bold" style={{ color: currentColors.text.primary }}>
-                  {stats.total_cves.toLocaleString()}
-                </div>
-              </div>
-              <div
-                className="rounded-lg shadow p-4"
-                style={{ backgroundColor: currentColors.bg.primary }}
-              >
-                <div className="text-sm" style={{ color: currentColors.text.secondary }}>
-                  Hoje
-                </div>
-                <div className="text-2xl font-bold" style={{ color: currentColors.text.primary }}>
-                  {stats.cves_today}
-                </div>
-              </div>
-              <div
-                className="rounded-lg shadow p-4"
-                style={{ backgroundColor: currentColors.bg.primary }}
-              >
-                <div className="text-sm" style={{ color: currentColors.text.secondary }}>
-                  Esta Semana
-                </div>
-                <div className="text-2xl font-bold" style={{ color: currentColors.text.primary }}>
-                  {stats.cves_this_week}
-                </div>
-              </div>
-              <div
-                className="rounded-lg shadow p-4"
-                style={{ backgroundColor: currentColors.bg.primary }}
-              >
-                <div className="text-sm" style={{ color: currentColors.text.secondary }}>
-                  Este Mês
-                </div>
-                <div className="text-2xl font-bold" style={{ color: currentColors.text.primary }}>
-                  {stats.cves_this_month.toLocaleString()}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Timeline Chart */}
-          {stats && getFilteredTimeline().length > 0 && (
-            <CVETimeline data={getFilteredTimeline()} />
-          )}
+            {showTimeline ? '▲ Ocultar' : '▼ Mostrar'}
+          </button>
         </div>
-
-        {/* Filter Bar */}
-        <CVEFilterBar
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          selectedSeverityLevels={selectedSeverityLevels}
-          onSeverityLevelChange={setSelectedSeverityLevels}
-          selectedSources={selectedSources}
-          onSourceChange={setSelectedSources}
-          dateRange={dateRange}
-          onDateRangeChange={setDateRange}
-          severityLevels={availableSeverityLevels}
-          sources={availableSources}
-        />
-      </div>
-
-      {/* Scrollable CVEs Grid Container */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="container mx-auto px-4 pb-8">
-          {/* CVEs Grid */}
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        {showTimeline && (
+          timelineData.length > 0 ? (
+            <div style={{ height: '150px', width: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={timelineData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={currentColors.border.default} />
+                  <XAxis
+                    dataKey="date"
+                    stroke={currentColors.text.secondary}
+                    tick={{ fill: currentColors.text.secondary, fontSize: 11 }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis
+                    stroke={currentColors.text.secondary}
+                    tick={{ fill: currentColors.text.secondary, fontSize: 11 }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: currentColors.bg.secondary,
+                      border: `1px solid ${currentColors.border.default}`,
+                      borderRadius: '8px',
+                      color: currentColors.text.primary
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="count"
+                    stroke={currentColors.accent.primary}
+                    strokeWidth={2}
+                    fill={`${currentColors.accent.primary}33`}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           ) : (
-            <CVEGrid cves={cves} />
+            <div style={{
+              height: '150px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: currentColors.text.secondary
+            }}>
+              Carregando timeline...
+            </div>
+          )
+        )}
+      </div>
+
+      {/* Main Layout - 2 Columns */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 300px',
+        gap: '12px',
+        flex: 1,
+        minHeight: 0,
+        maxHeight: '100%',
+        overflow: 'hidden'
+      }}>
+        {/* Left - CVE List */}
+        <div style={{
+          backgroundColor: currentColors.bg.secondary,
+          borderRadius: '8px',
+          border: `1px solid ${currentColors.border.default}`,
+          display: 'grid',
+          gridTemplateRows: 'auto 1fr auto',
+          overflow: 'hidden',
+          maxHeight: '100%'
+        }}>
+          {/* Header with Search */}
+          <div style={{
+            padding: '12px',
+            borderBottom: `1px solid ${currentColors.border.default}`
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '10px'
+            }}>
+              <h3 style={{ margin: '0', color: currentColors.text.primary, fontSize: '15px' }}>
+                CVE Vulnerabilities
+              </h3>
+            </div>
+
+            {/* Search and Filters */}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                placeholder="Buscar CVEs..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                style={{
+                  flex: 1,
+                  minWidth: '200px',
+                  padding: '8px 12px',
+                  backgroundColor: currentColors.bg.tertiary,
+                  border: `1px solid ${currentColors.border.default}`,
+                  borderRadius: '6px',
+                  color: currentColors.text.primary,
+                  fontSize: '13px'
+                }}
+              />
+              <select
+                value={selectedSeverity}
+                onChange={(e) => setSelectedSeverity(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: currentColors.bg.tertiary,
+                  border: `1px solid ${currentColors.border.default}`,
+                  borderRadius: '6px',
+                  color: currentColors.text.primary,
+                  fontSize: '13px'
+                }}
+              >
+                <option value="">Todas Severidades</option>
+                <option value="CRITICAL">Critical</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+              </select>
+              <select
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: currentColors.bg.tertiary,
+                  border: `1px solid ${currentColors.border.default}`,
+                  borderRadius: '6px',
+                  color: currentColors.text.primary,
+                  fontSize: '13px'
+                }}
+              >
+                <option value="24h">Últimas 24h</option>
+                <option value="7d">Últimos 7 dias</option>
+                <option value="30d">Últimos 30 dias</option>
+                <option value="all">Todos</option>
+              </select>
+              <button
+                onClick={handleSearch}
+                disabled={loading}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: currentColors.accent.primary,
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontWeight: '500',
+                  fontSize: '13px',
+                  opacity: loading ? 0.6 : 1
+                }}
+              >
+                {loading ? 'Buscando...' : 'Buscar'}
+              </button>
+            </div>
+          </div>
+
+          {/* CVE List - Scrollable */}
+          <div style={{
+            overflowY: 'auto',
+            padding: '10px 12px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            {loading && cves.length === 0 ? (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: currentColors.text.secondary
+              }}>
+                Carregando CVEs...
+              </div>
+            ) : cves.length === 0 ? (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: currentColors.text.secondary
+              }}>
+                Nenhum CVE encontrado
+              </div>
+            ) : (
+              cves.map((cve, idx) => (
+                <div
+                  key={`${cve.cve_id}-${idx}`}
+                  style={{
+                    padding: '12px',
+                    backgroundColor: currentColors.bg.tertiary,
+                    borderRadius: '6px',
+                    border: `1px solid ${currentColors.border.default}`,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = currentColors.accent.primary;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = currentColors.border.default;
+                  }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    marginBottom: '6px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        backgroundColor: getSeverityColor(cve.cve_severity_level),
+                        color: '#fff'
+                      }}>
+                        {cve.cve_severity_level || 'N/A'}
+                      </span>
+                      {cve.cve_severity_score > 0 && (
+                        <span style={{
+                          fontSize: '11px',
+                          color: currentColors.text.secondary
+                        }}>
+                          Score: {cve.cve_severity_score}
+                        </span>
+                      )}
+                    </div>
+                    <span style={{
+                      fontSize: '11px',
+                      color: currentColors.text.secondary
+                    }}>
+                      {new Date(cve.date).toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: currentColors.accent.primary,
+                    marginBottom: '4px'
+                  }}>
+                    {cve.cve_id}
+                  </div>
+                  <div style={{
+                    fontSize: '13px',
+                    color: currentColors.text.primary,
+                    marginBottom: '4px',
+                    fontWeight: '500'
+                  }}>
+                    {cve.cve_title}
+                  </div>
+                  <div style={{
+                    fontSize: '12px',
+                    color: currentColors.text.secondary,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical'
+                  }}>
+                    {cve.cve_content}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Pagination Controls */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '10px 12px',
+            borderTop: `1px solid ${currentColors.border.default}`,
+            backgroundColor: currentColors.bg.tertiary,
+            minHeight: '44px'
+          }}>
+            {cves.length > 0 ? (
+              <>
+                <span style={{ fontSize: '12px', color: currentColors.text.secondary }}>
+                  {cves.length} de {totalResults.toLocaleString('pt-BR')} (Página {currentPage})
+                </span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage <= 1 || loading}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: currentPage <= 1 ? currentColors.bg.secondary : currentColors.accent.primary,
+                      color: currentPage <= 1 ? currentColors.text.secondary : '#fff',
+                      border: `1px solid ${currentColors.border.default}`,
+                      borderRadius: '6px',
+                      cursor: currentPage <= 1 || loading ? 'not-allowed' : 'pointer',
+                      fontWeight: '500',
+                      fontSize: '12px',
+                      opacity: currentPage <= 1 ? 0.5 : 1
+                    }}
+                  >
+                    ← Anterior
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={!hasMore || loading}
+                    style={{
+                      padding: '6px 12px',
+                      backgroundColor: !hasMore ? currentColors.bg.secondary : currentColors.accent.primary,
+                      color: !hasMore ? currentColors.text.secondary : '#fff',
+                      border: `1px solid ${currentColors.border.default}`,
+                      borderRadius: '6px',
+                      cursor: !hasMore || loading ? 'not-allowed' : 'pointer',
+                      fontWeight: '500',
+                      fontSize: '12px',
+                      opacity: !hasMore ? 0.5 : 1
+                    }}
+                  >
+                    Próxima →
+                  </button>
+                </div>
+              </>
+            ) : (
+              <span style={{ fontSize: '12px', color: currentColors.text.secondary }}>
+                Faça uma busca para ver resultados
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right - Statistics */}
+        <div style={{
+          backgroundColor: currentColors.bg.secondary,
+          borderRadius: '8px',
+          padding: '12px',
+          border: `1px solid ${currentColors.border.default}`,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          maxHeight: '100%'
+        }}>
+          <h3 style={{ margin: '0 0 12px 0', color: currentColors.text.primary, fontSize: '14px' }}>
+            Estatísticas
+          </h3>
+
+          {/* Stats Cards */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+            <div style={{
+              padding: '10px',
+              backgroundColor: currentColors.bg.tertiary,
+              borderRadius: '6px',
+              border: `1px solid ${currentColors.border.default}`
+            }}>
+              <div style={{ fontSize: '11px', color: currentColors.text.secondary, marginBottom: '3px' }}>
+                Total de CVEs
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: '600', color: currentColors.accent.primary }}>
+                {stats?.total_cves.toLocaleString('pt-BR') || '0'}
+              </div>
+            </div>
+
+            <div style={{
+              padding: '10px',
+              backgroundColor: currentColors.bg.tertiary,
+              borderRadius: '6px',
+              border: `1px solid ${currentColors.border.default}`
+            }}>
+              <div style={{ fontSize: '11px', color: currentColors.text.secondary, marginBottom: '3px' }}>
+                Hoje
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: '600', color: currentColors.accent.success }}>
+                {stats?.cves_today || '0'}
+              </div>
+            </div>
+
+            <div style={{
+              padding: '10px',
+              backgroundColor: currentColors.bg.tertiary,
+              borderRadius: '6px',
+              border: `1px solid ${currentColors.border.default}`
+            }}>
+              <div style={{ fontSize: '11px', color: currentColors.text.secondary, marginBottom: '3px' }}>
+                Esta Semana
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: '600', color: currentColors.accent.warning }}>
+                {stats?.cves_this_week || '0'}
+              </div>
+            </div>
+
+            <div style={{
+              padding: '10px',
+              backgroundColor: currentColors.bg.tertiary,
+              borderRadius: '6px',
+              border: `1px solid ${currentColors.border.default}`
+            }}>
+              <div style={{ fontSize: '11px', color: currentColors.text.secondary, marginBottom: '3px' }}>
+                Este Mês
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: '600', color: '#a855f7' }}>
+                {stats?.cves_this_month.toLocaleString('pt-BR') || '0'}
+              </div>
+            </div>
+          </div>
+
+          {/* Severity Breakdown */}
+          {stats?.cves_by_severity && (
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              <h4 style={{ margin: '0 0 8px 0', color: currentColors.text.primary, fontSize: '13px' }}>
+                Por Severidade
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {Object.entries(stats.cves_by_severity)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([severity, count]) => (
+                    <div
+                      key={severity}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '6px 8px',
+                        backgroundColor: currentColors.bg.tertiary,
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => setSelectedSeverity(severity === selectedSeverity ? '' : severity)}
+                    >
+                      <span style={{
+                        fontSize: '12px',
+                        color: getSeverityColor(severity),
+                        fontWeight: severity === selectedSeverity ? '600' : '400'
+                      }}>
+                        {severity || 'N/A'}
+                      </span>
+                      <span style={{
+                        fontSize: '12px',
+                        color: currentColors.text.secondary
+                      }}>
+                        {count.toLocaleString('pt-BR')}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
           )}
         </div>
       </div>

@@ -138,7 +138,7 @@ const IOCBrowserPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center" style={{ backgroundColor: currentColors.bg.secondary }}>
+      <div className="h-full flex items-center justify-center" style={{ backgroundColor: currentColors.bg.secondary }}>
         <Loader2 className="animate-spin" size={48} style={{ color: currentColors.accent.primary }} />
       </div>
     );
@@ -146,7 +146,7 @@ const IOCBrowserPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="h-screen p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
+      <div className="h-full p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
         <div className="p-4 rounded-lg flex items-start gap-3" style={{ backgroundColor: '#fee2e2' }}>
           <AlertCircle size={20} color="#dc2626" />
           <div className="flex-1">
@@ -159,7 +159,7 @@ const IOCBrowserPage: React.FC = () => {
 
   if (!stats) {
     return (
-      <div className="h-screen p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
+      <div className="h-full p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
         <div className="p-6 rounded-lg text-center" style={{ backgroundColor: currentColors.bg.primary }}>
           <Database size={48} className="mx-auto mb-4" style={{ color: currentColors.text.secondary }} />
           <p style={{ color: currentColors.text.secondary }}>Nenhum IOC encontrado. Sincronize feeds primeiro.</p>
@@ -169,7 +169,7 @@ const IOCBrowserPage: React.FC = () => {
   }
 
   return (
-    <div className="h-screen overflow-y-auto p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
+    <div className="h-full overflow-y-auto p-6" style={{ backgroundColor: currentColors.bg.secondary }}>
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">

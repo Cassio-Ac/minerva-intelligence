@@ -93,7 +93,7 @@ function App() {
     <BrowserRouter>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100%', maxWidth: '100vw', overflow: 'hidden' }}>
         <Header />
-        <main style={{ flex: 1, width: '100%', maxWidth: '100vw', overflow: 'hidden' }}>
+        <main style={{ flex: 1, width: '100%', maxWidth: '100vw', overflow: 'hidden', minHeight: 0, height: '100%' }}>
           <Routes>
         {/* Login */}
         <Route path="/login" element={<LoginPage />} />
