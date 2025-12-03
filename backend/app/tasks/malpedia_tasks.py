@@ -1,12 +1,19 @@
 """
 Malpedia Celery Tasks
-Background tasks for Malpedia Library enrichment
+Background tasks for Malpedia Library collection and enrichment
+
+Tasks:
+- sync_malpedia_library_rss: Sync via RSS feed (incremental, frequent)
+- sync_malpedia_library_bibtex: Sync via BibTeX (full, weekly)
+- sync_malpedia_library_full: Sync both sources
+- enrich_malpedia_library: LLM enrichment of articles
 """
 
 import logging
 import asyncio
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Add backend to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -14,6 +21,118 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from app.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# MALPEDIA LIBRARY COLLECTION TASKS (RSS + BibTeX)
+# ============================================================
+
+@celery_app.task(name="app.tasks.malpedia_tasks.sync_malpedia_library_rss", bind=True)
+def sync_malpedia_library_rss(self):
+    """
+    Periodic task: Sync Malpedia Library via RSS feed
+
+    Fetches latest library entries from RSS feed and indexes to Elasticsearch.
+    Fast incremental sync - run frequently (2x/day).
+
+    Returns:
+        Sync stats
+    """
+    logger.info("Starting Malpedia Library RSS sync task")
+
+    try:
+        from app.services.malpedia_library_service import run_malpedia_library_rss_sync
+
+        result = asyncio.run(run_malpedia_library_rss_sync())
+
+        logger.info(f"Malpedia Library RSS sync completed: {result}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Malpedia Library RSS sync failed: {e}")
+        raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries), max_retries=3)
+
+
+@celery_app.task(name="app.tasks.malpedia_tasks.sync_malpedia_library_bibtex", bind=True)
+def sync_malpedia_library_bibtex(self):
+    """
+    Periodic task: Sync Malpedia Library via BibTeX download
+
+    Downloads complete BibTeX bibliography and indexes to Elasticsearch.
+    Full sync - run less frequently (1x/week).
+
+    Returns:
+        Sync stats
+    """
+    logger.info("Starting Malpedia Library BibTeX sync task")
+
+    try:
+        from app.services.malpedia_library_service import run_malpedia_library_bibtex_sync
+
+        result = asyncio.run(run_malpedia_library_bibtex_sync())
+
+        logger.info(f"Malpedia Library BibTeX sync completed: {result}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Malpedia Library BibTeX sync failed: {e}")
+        raise self.retry(exc=e, countdown=120 * (2 ** self.request.retries), max_retries=2)
+
+
+@celery_app.task(name="app.tasks.malpedia_tasks.sync_malpedia_library_full", bind=True)
+def sync_malpedia_library_full(self):
+    """
+    Full sync task: Sync Malpedia Library from both RSS and BibTeX
+
+    Returns:
+        Combined sync stats
+    """
+    logger.info("Starting FULL Malpedia Library sync task (RSS + BibTeX)")
+
+    try:
+        from app.services.malpedia_library_service import run_malpedia_library_full_sync
+
+        result = asyncio.run(run_malpedia_library_full_sync())
+
+        logger.info(f"Full Malpedia Library sync completed: {result}")
+        return result
+
+    except Exception as e:
+        logger.error(f"Full Malpedia Library sync failed: {e}")
+        raise self.retry(exc=e, countdown=180 * (2 ** self.request.retries), max_retries=2)
+
+
+@celery_app.task(name="app.tasks.malpedia_tasks.get_malpedia_library_stats")
+def get_malpedia_library_stats():
+    """
+    Get Malpedia Library stats from Elasticsearch
+
+    Returns:
+        Stats dict
+    """
+    logger.info("Getting Malpedia Library stats")
+
+    try:
+        from app.services.malpedia_library_service import MalpediaLibraryService
+
+        async def _get_stats():
+            service = MalpediaLibraryService()
+            try:
+                return await service.get_stats()
+            finally:
+                await service.close()
+
+        result = asyncio.run(_get_stats())
+        return result
+
+    except Exception as e:
+        logger.error(f"Error getting Malpedia Library stats: {e}")
+        return {'error': str(e)}
+
+
+# ============================================================
+# MALPEDIA LIBRARY ENRICHMENT TASKS (LLM)
+# ============================================================
 
 
 @celery_app.task(name="app.tasks.malpedia_tasks.enrich_malpedia_library", bind=True)
