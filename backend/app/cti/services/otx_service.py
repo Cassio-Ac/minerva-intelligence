@@ -5,8 +5,8 @@ Service para buscar IOCs no AlienVault OTX (Open Threat Exchange)
 """
 import requests
 import logging
-import os
 from typing import Dict, Optional
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class OTXService:
     BASE_URL = "https://otx.alienvault.com/api/v1"
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("OTX_API_KEY")
+        self.api_key = api_key or settings.OTX_API_KEY
         if not self.api_key:
             logger.warning("⚠️ OTX API key not configured")
 

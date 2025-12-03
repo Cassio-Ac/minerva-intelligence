@@ -8,14 +8,15 @@ from celery.schedules import crontab
 import os
 
 # Redis connection for Celery broker and backend
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+# Default to localhost for local development, redis:6379 for Docker
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # Create Celery app
 celery_app = Celery(
     "minerva",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["app.tasks.rss_tasks", "app.tasks.malpedia_tasks", "app.tasks.misp_tasks"]
+    include=["app.tasks.rss_tasks", "app.tasks.malpedia_tasks", "app.tasks.misp_tasks", "app.tasks.otx_tasks", "app.tasks.caveiratech_tasks"]
 )
 
 # Celery configuration
@@ -45,6 +46,11 @@ celery_app.conf.update(
             "schedule": crontab(minute=0, hour="8,20"),  # 08:00 and 20:00
         },
 
+        # Malpedia Library RSS/BibTeX - DISABLED (run on-demand only via API)
+        # BibTeX is the full library (17k+ entries), download manually when needed
+        # RSS available at /api/v1/malpedia-library/sync-now/rss
+        # BibTeX available at /api/v1/malpedia-library/sync-now/bibtex
+
         # Malpedia enrichment - 1x per day (02:00 Brazil time)
         "enrich-malpedia-library": {
             "task": "app.tasks.malpedia_tasks.enrich_malpedia_library",
@@ -55,6 +61,37 @@ celery_app.conf.update(
         "sync-misp-feeds": {
             "task": "app.tasks.misp_tasks.sync_all_misp_feeds",
             "schedule": crontab(minute=0, hour="0,6,12,18"),  # Every 6 hours
+        },
+
+        # OTX pulse sync - 2x per day (09:00 and 21:00 Brazil time)
+        "sync-otx-pulses": {
+            "task": "app.tasks.otx_tasks.sync_otx_pulses",
+            "schedule": crontab(minute=0, hour="9,21"),  # 09:00 and 21:00
+        },
+
+        # OTX bulk IOC enrichment - 1x per day (03:00 Brazil time)
+        "bulk-enrich-iocs-otx": {
+            "task": "app.tasks.otx_tasks.bulk_enrich_iocs",
+            "schedule": crontab(minute=0, hour=3),  # 03:00 AM
+        },
+
+        # OTX to MISP export - 1x per day (04:00 Brazil time)
+        "export-otx-pulses-to-misp": {
+            "task": "app.tasks.otx_tasks.export_pulses_to_misp",
+            "schedule": crontab(minute=0, hour=4),  # 04:00 AM
+        },
+
+        # Reset OTX daily usage counters - 1x per day (00:00 Brazil time)
+        "reset-otx-daily-usage": {
+            "task": "app.tasks.otx_tasks.reset_otx_daily_usage",
+            "schedule": crontab(minute=0, hour=0),  # Midnight
+        },
+
+        # CaveiraTech crawler - 2x per day (10:00 and 22:00 Brazil time)
+        "sync-caveiratech": {
+            "task": "app.tasks.caveiratech_tasks.sync_caveiratech",
+            "schedule": crontab(minute=0, hour="10,22"),  # 10:00 and 22:00
+            "kwargs": {"max_pages": 10},  # Incremental sync (latest 10 pages)
         },
     },
 )

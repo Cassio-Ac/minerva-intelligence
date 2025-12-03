@@ -21,6 +21,8 @@ import MISPFeedsPage from '@pages/cti/MISPFeedsPage'
 import IOCEnrichmentPage from '@pages/cti/IOCEnrichmentPage'
 import IOCSearchPage from '@pages/cti/IOCSearchPage'
 import IOCBrowserPage from '@pages/cti/IOCBrowserPage'
+import CredentialsPage from '@pages/CredentialsPage'
+import DataLakePage from '@pages/DataLakePage'
 import { Header } from './components/Header'
 import { useDashboardStore } from '@stores/dashboardStore'
 import { useSettingsStore } from '@stores/settingsStore'
@@ -129,6 +131,10 @@ function App() {
         {/* Telegram Intelligence */}
         <Route path="/telegram" element={<ProtectedRoute><TelegramIntelligence /></ProtectedRoute>} />
         <Route path="/telegram/conversation" element={<ProtectedRoute><TelegramConversation /></ProtectedRoute>} />
+
+        {/* Credentials Module */}
+        <Route path="/credentials" element={<ProtectedRoute><CredentialsPage /></ProtectedRoute>} />
+        <Route path="/datalake" element={<ProtectedRoute><DataLakePage /></ProtectedRoute>} />
 
         {/* CTI Dashboard */}
         <Route path="/cti" element={<ProtectedRoute><CTIDashboard /></ProtectedRoute>} />

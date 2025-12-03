@@ -24,11 +24,13 @@ from app.api.v1 import metrics  # System metrics
 from app.api.v1 import export  # Export (PDF/PNG)
 from app.api.v1 import admin  # Admin endpoints
 from app.api.v1 import csv_upload, index_access  # CSV upload and index access management
-from app.api.v1 import rss  # RSS feeds
+from app.api.v1 import rss, caveiratech, malpedia_library  # RSS feeds & CaveiraTech & Malpedia Library
 from app.api.v1 import breaches  # Data Breaches & Leaks
 from app.api.v1 import cves  # CVE Detection
 from app.api.v1 import telegram, telegram_blacklist  # Telegram Intelligence
 from app.cti.api import actors as cti_actors, families as cti_families, techniques as cti_techniques, enrichment as cti_enrichment, misp_feeds, ioc_enrichment, galaxy as cti_galaxy, otx_keys, otx_pulses  # CTI Module (isolated)
+from app.credentials.api import external_query as credentials_external_query  # Credentials Module
+from app.credentials.api import datalake as credentials_datalake  # Credentials Data Lake
 from app.websocket import sio
 from app.middleware.metrics_middleware import MetricsMiddleware
 
@@ -94,6 +96,8 @@ app.include_router(admin.router, prefix="/api/v1", tags=["admin"])
 app.include_router(csv_upload.router, prefix="/api/v1", tags=["csv-upload"])
 app.include_router(index_access.router, prefix="/api/v1", tags=["index-access"])
 app.include_router(rss.router, prefix="/api/v1", tags=["rss"])
+app.include_router(caveiratech.router, prefix="/api/v1", tags=["caveiratech"])
+app.include_router(malpedia_library.router, prefix="/api/v1", tags=["malpedia-library"])
 app.include_router(breaches.router, prefix="/api/v1", tags=["breaches"])
 app.include_router(cves.router, prefix="/api/v1", tags=["cves"])
 app.include_router(telegram.router, prefix="/api/v1", tags=["telegram"])
@@ -109,6 +113,10 @@ app.include_router(ioc_enrichment.router, prefix="/api/v1/cti", tags=["CTI - IOC
 app.include_router(cti_galaxy.router, prefix="/api/v1/cti", tags=["CTI - MISP Galaxy"])
 app.include_router(otx_keys.router, prefix="/api/v1/cti/otx", tags=["CTI - OTX"])
 app.include_router(otx_pulses.router, prefix="/api/v1/cti/otx", tags=["CTI - OTX Pulses"])
+
+# Credentials Module (Leaked Credentials Lookup)
+app.include_router(credentials_external_query.router, prefix="/api/v1", tags=["Credentials"])
+app.include_router(credentials_datalake.router, prefix="/api/v1", tags=["Credentials - Data Lake"])
 
 # Mount static files (profile photos, downloads, etc)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -179,6 +187,23 @@ async def startup_event():
     # Iniciar cleanup em background
     asyncio.create_task(periodic_cleanup())
     logger.info("✅ Periodic downloads cleanup scheduled (every 6 hours)")
+
+    # ========== 3.5. Inicializar cleanup de credenciais ==========
+    from app.credentials.services.cleanup_service import cleanup_expired_credentials
+
+    async def periodic_credentials_cleanup():
+        """Executa cleanup de credenciais a cada 6 horas"""
+        while True:
+            try:
+                await cleanup_expired_credentials()
+                # Aguardar 6 horas
+                await asyncio.sleep(21600)
+            except Exception as e:
+                logger.error(f"Error in credentials cleanup: {e}")
+                await asyncio.sleep(3600)
+
+    asyncio.create_task(periodic_credentials_cleanup())
+    logger.info("✅ Credentials cleanup scheduled (every 6 hours, retention: 7 days)")
 
     # ========== 4. Inicializar AD Sync Scheduler ==========
     from app.services.ad_sync_scheduler import get_ad_sync_scheduler

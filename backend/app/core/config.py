@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "json"
 
+    # External API Keys
+    OTX_API_KEY: Optional[str] = None  # AlienVault OTX
+    OPENAI_API_KEY: Optional[str] = None  # OpenAI
+
     model_config = {
         "env_file": ".env",
         "case_sensitive": True,
