@@ -43,7 +43,10 @@ Database: dashboard_ai
 
 **💡 Recomendação**: Use **porta 5180** (dev mode) para desenvolvimento ativo com hot reload.
 
-**📖 Consulte [`PORTS_REFERENCE.md`](./PORTS_REFERENCE.md) para detalhes completos sobre portas, databases, modos de execução e troubleshooting.**
+**📖 Documentação de Suporte:**
+- [`PORTS_REFERENCE.md`](./PORTS_REFERENCE.md) - Referência completa de portas e modos de execução
+- [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md) - Guia detalhado de solução de problemas
+- [`QUICK_REFERENCE.md`](./QUICK_REFERENCE.md) - Referência rápida de comandos e URLs
 
 ---
 
