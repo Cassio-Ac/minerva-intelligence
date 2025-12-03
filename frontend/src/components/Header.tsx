@@ -9,6 +9,59 @@ import { useAuthStore } from '../stores/authStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { API_URL, API_BASE_URL } from '../config/api';
 
+// Tooltip component
+const Tooltip: React.FC<{ text: string; children: React.ReactNode }> = ({ text, children }) => {
+  const [show, setShow] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const ref = useRef<HTMLDivElement>(null);
+  const { currentColors } = useSettingsStore();
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.bottom + 8,
+      });
+    }
+    setShow(true);
+  };
+
+  return (
+    <div
+      ref={ref}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setShow(false)}
+      style={{ position: 'relative', display: 'inline-block' }}
+    >
+      {children}
+      {show && (
+        <div
+          style={{
+            position: 'fixed',
+            left: position.x,
+            top: position.y,
+            transform: 'translateX(-50%)',
+            backgroundColor: currentColors.bg.primary,
+            color: currentColors.text.primary,
+            padding: '6px 12px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: '500',
+            whiteSpace: 'nowrap',
+            zIndex: 99999,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+            border: `1px solid ${currentColors.border.default}`,
+            pointerEvents: 'none',
+          }}
+        >
+          {text}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -38,17 +91,26 @@ export const Header: React.FC = () => {
     return null;
   }
 
-  const navLinks = [
-    { path: '/', label: 'Home', icon: '🏠' },
-    { path: '/dashboards', label: 'Dashboards', icon: '📊' },
-    { path: '/chat', label: 'Chat', icon: '💬', requiresLLM: true },
-    { path: '/info', label: 'Info', icon: '📰' },
-    { path: '/leaks', label: 'Data Leaks', icon: '⚠️' },
-    { path: '/cves', label: 'CVEs', icon: '🛡️' },
-    { path: '/telegram', label: 'Telegram', icon: '✈️' },
-    { path: '/cti', label: 'CTI', icon: '🎯' },
-    { path: '/downloads', label: 'Downloads', icon: '⬇️' },
-    { path: '/settings', label: 'Configurações', icon: '⚙️', requiresAdmin: true },
+  const navLinks: Array<{
+    path: string;
+    label: string;
+    icon?: string;
+    iconImage?: string;
+    requiresLLM?: boolean;
+    requiresAdmin?: boolean;
+  }> = [
+    { path: '/', label: 'Home', iconImage: '/assets/icons/home.webp' },
+    { path: '/dashboards', label: 'Dashboards', iconImage: '/assets/icons/dashboard.webp' },
+    { path: '/chat', label: 'Chat', iconImage: '/assets/icons/chat.png', requiresLLM: true },
+    { path: '/info', label: 'Info', iconImage: '/assets/icons/rss.png' },
+    { path: '/leaks', label: 'Data Leaks', iconImage: '/assets/icons/dataleak.png' },
+    { path: '/cves', label: 'CVEs', iconImage: '/assets/icons/cve.avif' },
+    { path: '/telegram', label: 'Telegram', iconImage: '/assets/icons/telegram.png' },
+    { path: '/credentials', label: 'Credenciais', iconImage: '/assets/icons/creds.png' },
+    { path: '/datalake', label: 'Data Lake', iconImage: '/assets/icons/data_lake.png' },
+    { path: '/cti', label: 'CTI', iconImage: '/assets/icons/CTI.png' },
+    { path: '/downloads', label: 'Downloads', iconImage: '/assets/icons/download.png' },
+    { path: '/settings', label: 'Configurações', iconImage: '/assets/icons/config.png', requiresAdmin: true },
   ];
 
   const canAccessLink = (link: any) => {
@@ -130,42 +192,62 @@ export const Header: React.FC = () => {
         </Link>
 
         {/* Navigation Links */}
-        <nav style={{ display: 'flex', gap: '16px', alignItems: 'center', minWidth: 0, overflow: 'hidden' }}>
+        <nav style={{ display: 'flex', gap: '8px', alignItems: 'center', minWidth: 0, overflow: 'hidden' }}>
           {navLinks.map(
             (link) =>
               canAccessLink(link) && (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  style={{
-                    color:
-                      location.pathname === link.path
-                        ? currentColors.accent.primary
-                        : currentColors.text.secondary,
-                    textDecoration: 'none',
-                    fontSize: '14px',
-                    fontWeight: location.pathname === link.path ? '600' : '400',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    backgroundColor:
-                      location.pathname === link.path
-                        ? `${currentColors.accent.primary}15`
-                        : 'transparent',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (location.pathname !== link.path) {
-                      e.currentTarget.style.backgroundColor = currentColors.bg.hover;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (location.pathname !== link.path) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }
-                  }}
-                >
-                  {link.icon} {link.label}
-                </Link>
+                <Tooltip key={link.path} text={link.label}>
+                  <Link
+                    to={link.path}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textDecoration: 'none',
+                      padding: '8px',
+                      borderRadius: '8px',
+                      backgroundColor:
+                        location.pathname === link.path
+                          ? `${currentColors.accent.primary}20`
+                          : 'transparent',
+                      border: location.pathname === link.path
+                        ? `2px solid ${currentColors.accent.primary}`
+                        : '2px solid transparent',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (location.pathname !== link.path) {
+                        e.currentTarget.style.backgroundColor = currentColors.bg.hover;
+                        e.currentTarget.style.transform = 'scale(1.1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (location.pathname !== link.path) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }
+                    }}
+                  >
+                    {link.iconImage ? (
+                      <img
+                        src={link.iconImage}
+                        alt={link.label}
+                        style={{
+                          width: '22px',
+                          height: '22px',
+                          objectFit: 'contain',
+                          opacity: location.pathname === link.path ? 1 : 0.7,
+                          transition: 'opacity 0.2s',
+                        }}
+                      />
+                    ) : (
+                      <span style={{
+                        fontSize: '18px',
+                        opacity: location.pathname === link.path ? 1 : 0.7,
+                      }}>{link.icon}</span>
+                    )}
+                  </Link>
+                </Tooltip>
               )
           )}
         </nav>
