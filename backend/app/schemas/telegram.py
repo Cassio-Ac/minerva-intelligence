@@ -14,14 +14,16 @@ class TelegramMessageSearchRequest(BaseModel):
     """Request para busca de mensagens"""
     text: str = Field(..., description="Texto a buscar nas mensagens")
     is_exact_search: bool = Field(default=False, description="Se True, busca exata. Se False, busca inteligente")
-    max_results: int = Field(default=500, ge=1, le=10000, description="Máximo de resultados")
+    page: int = Field(default=1, ge=1, description="Número da página (começa em 1)")
+    page_size: int = Field(default=50, ge=1, le=100, description="Tamanho da página")
     server_id: Optional[str] = Field(default=None, description="ID do servidor Elasticsearch")
 
 
 class TelegramUserSearchRequest(BaseModel):
     """Request para busca por usuário"""
     search_term: str = Field(..., description="Termo de busca (user_id, username ou nome)")
-    max_results: int = Field(default=500, ge=1, le=10000, description="Máximo de resultados")
+    page: int = Field(default=1, ge=1, description="Número da página (começa em 1)")
+    page_size: int = Field(default=50, ge=1, le=100, description="Tamanho da página")
     server_id: Optional[str] = Field(default=None, description="ID do servidor Elasticsearch")
 
 
@@ -63,16 +65,22 @@ class TelegramMessage(BaseModel):
 
 class TelegramMessageSearchResponse(BaseModel):
     """Response de busca de mensagens"""
-    total: int = Field(..., description="Total de mensagens encontradas")
+    total: int = Field(..., description="Total de mensagens encontradas (estimado)")
     messages: List[Dict[str, Any]] = Field(default_factory=list, description="Lista de mensagens")
     search_type: str = Field(..., description="Tipo de busca utilizada")
+    page: int = Field(..., description="Página atual")
+    page_size: int = Field(..., description="Tamanho da página")
+    has_more: bool = Field(..., description="Se há mais páginas disponíveis")
 
 
 class TelegramUserSearchResponse(BaseModel):
     """Response de busca por usuário"""
-    total: int = Field(..., description="Total de mensagens encontradas")
+    total: int = Field(..., description="Total de mensagens encontradas (estimado)")
     messages: List[Dict[str, Any]] = Field(default_factory=list, description="Lista de mensagens")
     search_term: str = Field(..., description="Termo buscado")
+    page: int = Field(..., description="Página atual")
+    page_size: int = Field(..., description="Tamanho da página")
+    has_more: bool = Field(..., description="Se há mais páginas disponíveis")
 
 
 class TelegramMessageContextResponse(BaseModel):

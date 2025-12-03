@@ -37,11 +37,12 @@ async def search_messages(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Busca mensagens por texto
+    Busca mensagens por texto com paginação
 
     - **text**: Texto a buscar
     - **is_exact_search**: Se True, busca exata (substring). Se False, busca inteligente
-    - **max_results**: Máximo de resultados (padrão: 500, max: 10000)
+    - **page**: Número da página (começa em 1)
+    - **page_size**: Tamanho da página (padrão: 50, max: 100)
     - **server_id**: ID do servidor Elasticsearch (opcional)
     """
     try:
@@ -50,7 +51,8 @@ async def search_messages(
         result = await service.search_messages(
             text=request.text,
             is_exact_search=request.is_exact_search,
-            max_results=request.max_results,
+            page=request.page,
+            page_size=request.page_size,
             server_id=request.server_id
         )
 
@@ -68,7 +70,10 @@ async def search_messages(
         return TelegramMessageSearchResponse(
             total=result['total'],
             messages=messages_with_index,
-            search_type=result['search_type']
+            search_type=result['search_type'],
+            page=result['page'],
+            page_size=result['page_size'],
+            has_more=result['has_more']
         )
 
     except Exception as e:
@@ -85,10 +90,11 @@ async def search_by_user(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Busca mensagens por usuário (user_id, username ou nome completo)
+    Busca mensagens por usuário (user_id, username ou nome completo) com paginação
 
     - **search_term**: Termo de busca (user_id, username ou nome)
-    - **max_results**: Máximo de resultados (padrão: 500, max: 10000)
+    - **page**: Número da página (começa em 1)
+    - **page_size**: Tamanho da página (padrão: 50, max: 100)
     - **server_id**: ID do servidor Elasticsearch (opcional)
     """
     try:
@@ -96,7 +102,8 @@ async def search_by_user(
 
         result = await service.search_by_user(
             search_term=request.search_term,
-            max_results=request.max_results,
+            page=request.page,
+            page_size=request.page_size,
             server_id=request.server_id
         )
 
@@ -114,7 +121,10 @@ async def search_by_user(
         return TelegramUserSearchResponse(
             total=result['total'],
             messages=messages_with_index,
-            search_term=result['search_term']
+            search_term=result['search_term'],
+            page=result['page'],
+            page_size=result['page_size'],
+            has_more=result['has_more']
         )
 
     except Exception as e:

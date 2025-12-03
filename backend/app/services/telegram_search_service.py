@@ -129,20 +129,22 @@ class TelegramSearchService:
         self,
         text: str,
         is_exact_search: bool = False,
-        max_results: int = 500,
+        page: int = 1,
+        page_size: int = 50,
         server_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Busca por texto na mensagem
+        Busca por texto na mensagem com paginação
 
         Args:
             text: Texto a buscar
             is_exact_search: Se True, busca exata (substring). Se False, busca inteligente
-            max_results: Máximo de resultados (padrão: 500)
+            page: Número da página (começa em 1)
+            page_size: Tamanho da página
             server_id: ID do servidor ES (opcional)
 
         Returns:
-            Dicionário com mensagens encontradas
+            Dicionário com mensagens encontradas e info de paginação
         """
         try:
             texto_lower = text.lower()
@@ -177,41 +179,109 @@ class TelegramSearchService:
             factory = ESClientFactory()
             es = await factory.get_client(server_id)
 
-            response = await es.search(
-                index=INDEX_PATTERN,
-                body={
-                    "query": query,
-                    "size": max_results,
-                    "sort": sort_order,
-                    "_source": ["id", "date", "message", "sender_info", "group_info"]
-                }
-            )
-
-            hits = response['hits']['hits']
-            total = response['hits']['total']['value']
-
-            # Apply blacklist filtering
+            # Get blacklist patterns first
             blacklist_patterns = await get_active_blacklist_patterns()
+
+            # When blacklist is active, we need to fetch more results iteratively
+            # to compensate for filtered messages
             if blacklist_patterns:
-                filtered_hits = []
-                filtered_count = 0
+                # Start from the logical page offset, but we'll need to skip filtered messages
+                collected_hits = []
+                es_from = 0
+                batch_size = 200  # Fetch in larger batches for efficiency
+                max_iterations = 20  # Safety limit
+                iterations = 0
 
-                for hit in hits:
-                    message_text = hit['_source'].get('message', '')
-                    if not message_matches_blacklist(message_text, blacklist_patterns):
-                        filtered_hits.append(hit)
-                    else:
-                        filtered_count += 1
+                # Calculate how many valid messages we need to skip (for pagination)
+                skip_count = (page - 1) * page_size
+                skipped = 0
+                total_filtered = 0
 
-                logger.info(f"🚫 Filtered out {filtered_count} messages matching blacklist patterns")
-                hits = filtered_hits
-                total = len(filtered_hits)
+                while len(collected_hits) < page_size and iterations < max_iterations:
+                    iterations += 1
 
-            return {
-                "total": total,
-                "hits": hits,
-                "search_type": "exact" if is_exact_search else "intelligent"
-            }
+                    response = await es.search(
+                        index=INDEX_PATTERN,
+                        body={
+                            "query": query,
+                            "from": es_from,
+                            "size": batch_size,
+                            "sort": sort_order,
+                            "_source": ["id", "date", "message", "sender_info", "group_info"],
+                            "track_total_hits": True
+                        }
+                    )
+
+                    batch_hits = response['hits']['hits']
+                    total_es = response['hits']['total']['value']
+
+                    if not batch_hits:
+                        # No more results from ES
+                        break
+
+                    # Filter this batch
+                    for hit in batch_hits:
+                        message_text = hit['_source'].get('message', '')
+                        if not message_matches_blacklist(message_text, blacklist_patterns):
+                            # Valid message (not blacklisted)
+                            if skipped < skip_count:
+                                # Still skipping for pagination
+                                skipped += 1
+                            else:
+                                # Collect this message
+                                collected_hits.append(hit)
+                                if len(collected_hits) >= page_size:
+                                    break
+                        else:
+                            total_filtered += 1
+
+                    es_from += batch_size
+
+                    # Check if we've exhausted ES results
+                    if es_from >= total_es:
+                        break
+
+                logger.info(f"🚫 Filtered out {total_filtered} messages matching blacklist (iterations: {iterations})")
+
+                # Determine if there are more results
+                has_more = es_from < total_es or len(batch_hits) == batch_size
+
+                return {
+                    "total": total_es,
+                    "hits": collected_hits,
+                    "search_type": "exact" if is_exact_search else "intelligent",
+                    "page": page,
+                    "page_size": page_size,
+                    "has_more": has_more and len(collected_hits) == page_size
+                }
+            else:
+                # No blacklist - simple pagination
+                es_from = (page - 1) * page_size
+
+                response = await es.search(
+                    index=INDEX_PATTERN,
+                    body={
+                        "query": query,
+                        "from": es_from,
+                        "size": page_size,
+                        "sort": sort_order,
+                        "_source": ["id", "date", "message", "sender_info", "group_info"],
+                        "track_total_hits": True
+                    }
+                )
+
+                hits = response['hits']['hits']
+                total_es = response['hits']['total']['value']
+                has_more = (es_from + page_size) < total_es
+
+                return {
+                    "total": total_es,
+                    "hits": hits,
+                    "search_type": "exact" if is_exact_search else "intelligent",
+                    "page": page,
+                    "page_size": page_size,
+                    "has_more": has_more
+                }
 
         except Exception as e:
             logger.error(f"❌ Error searching messages: {e}")
@@ -220,19 +290,21 @@ class TelegramSearchService:
     async def search_by_user(
         self,
         search_term: str,
-        max_results: int = 500,
+        page: int = 1,
+        page_size: int = 50,
         server_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Busca mensagens por usuário (user_id, username ou nome completo)
+        Busca mensagens por usuário (user_id, username ou nome completo) com paginação
 
         Args:
             search_term: Termo de busca (user_id, username ou nome)
-            max_results: Máximo de resultados (padrão: 500)
+            page: Número da página (começa em 1)
+            page_size: Tamanho da página
             server_id: ID do servidor ES (opcional)
 
         Returns:
-            Dicionário com mensagens encontradas
+            Dicionário com mensagens encontradas e info de paginação
         """
         try:
             termo_lower = search_term.lower().strip()
@@ -309,23 +381,35 @@ class TelegramSearchService:
             factory = ESClientFactory()
             es = await factory.get_client(server_id)
 
+            # Calculate ES pagination
+            es_from = (page - 1) * page_size
+            es_size = page_size
+
             response = await es.search(
                 index=INDEX_PATTERN,
                 body={
                     "query": query,
-                    "size": max_results,
+                    "from": es_from,
+                    "size": es_size,
                     "sort": [{"date": "desc"}],
-                    "_source": ["id", "date", "message", "sender_info", "group_info"]
+                    "_source": ["id", "date", "message", "sender_info", "group_info"],
+                    "track_total_hits": True
                 }
             )
 
             hits = response['hits']['hits']
             total = response['hits']['total']['value']
 
+            # Calculate if there are more results
+            has_more = (es_from + es_size) < total
+
             return {
                 "total": total,
                 "hits": hits,
-                "search_term": search_term
+                "search_term": search_term,
+                "page": page,
+                "page_size": page_size,
+                "has_more": has_more
             }
 
         except Exception as e:

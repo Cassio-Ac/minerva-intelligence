@@ -12,9 +12,16 @@ logger = logging.getLogger(__name__)
 # Create Socket.IO server
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins='*',  # Em produção, especificar origins permitidas
-    logger=False,
-    engineio_logger=False
+    cors_allowed_origins=[
+        'http://localhost:5174',
+        'http://localhost:5180',
+        'http://localhost:3000',
+        'http://127.0.0.1:5174',
+        'http://127.0.0.1:5180',
+        'http://127.0.0.1:3000'
+    ],
+    logger=True,
+    engineio_logger=True
 )
 
 
