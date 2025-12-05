@@ -74,7 +74,7 @@ const InfoPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedSource, setSelectedSource] = useState<string>('');
-  const [dateRange, setDateRange] = useState('7d');
+  const [dateRange, setDateRange] = useState('all');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);

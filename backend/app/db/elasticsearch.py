@@ -24,13 +24,13 @@ class ElasticsearchClient:
                 [url],
                 basic_auth=(username, password),
                 verify_certs=False,
-                request_timeout=30,
+                request_timeout=120,  # 2 minutos para buscas pesadas (Data Lake 230M docs)
             )
         else:
             cls._instance = AsyncElasticsearch(
                 [url],
                 verify_certs=False,
-                request_timeout=30,
+                request_timeout=120,  # 2 minutos para buscas pesadas
             )
 
         cls._default_config = {
@@ -123,13 +123,13 @@ def get_sync_es_client() -> Elasticsearch:
             [url],
             basic_auth=(username, password),
             verify_certs=False,
-            request_timeout=30,
+            request_timeout=120,  # 2 minutos para buscas pesadas
         )
     else:
         return Elasticsearch(
             [url],
             verify_certs=False,
-            request_timeout=30,
+            request_timeout=120,  # 2 minutos para buscas pesadas
         )
 
 

@@ -9,7 +9,8 @@ from passlib.context import CryptContext
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Database URL
-DB_URL = "postgresql://intelligence_user:intelligence_pass_secure_2024@postgres:5432/intelligence_platform"
+import os
+DB_URL = os.getenv("DATABASE_URL", "postgresql://minerva:MinervaDB2024@localhost:5432/minerva_db").replace("+asyncpg", "")
 
 def main():
     print("🚀 Creating admin user for Minerva...")

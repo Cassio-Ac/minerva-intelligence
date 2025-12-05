@@ -27,6 +27,7 @@ from app.api.v1 import csv_upload, index_access  # CSV upload and index access m
 from app.api.v1 import rss, caveiratech, malpedia_library  # RSS feeds & CaveiraTech & Malpedia Library
 from app.api.v1 import breaches  # Data Breaches & Leaks
 from app.api.v1 import cves  # CVE Detection
+from app.api.v1 import cpf  # CPF Lookup
 from app.api.v1 import telegram, telegram_blacklist  # Telegram Intelligence
 from app.cti.api import actors as cti_actors, families as cti_families, techniques as cti_techniques, enrichment as cti_enrichment, misp_feeds, ioc_enrichment, galaxy as cti_galaxy, otx_keys, otx_pulses  # CTI Module (isolated)
 from app.credentials.api import external_query as credentials_external_query  # Credentials Module
@@ -100,6 +101,7 @@ app.include_router(caveiratech.router, prefix="/api/v1", tags=["caveiratech"])
 app.include_router(malpedia_library.router, prefix="/api/v1", tags=["malpedia-library"])
 app.include_router(breaches.router, prefix="/api/v1", tags=["breaches"])
 app.include_router(cves.router, prefix="/api/v1", tags=["cves"])
+app.include_router(cpf.router, prefix="/api/v1", tags=["cpf"])
 app.include_router(telegram.router, prefix="/api/v1", tags=["telegram"])
 app.include_router(telegram_blacklist.router, prefix="/api/v1", tags=["telegram"])
 

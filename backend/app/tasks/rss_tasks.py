@@ -17,6 +17,16 @@ from sqlalchemy import select
 logger = logging.getLogger(__name__)
 
 
+def _run_async(coro):
+    """Helper to run async code in Celery worker with fresh event loop"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
 @celery_app.task(name="app.tasks.rss_tasks.collect_all_rss_feeds", bind=True)
 def collect_all_rss_feeds(self):
     """
@@ -26,8 +36,8 @@ def collect_all_rss_feeds(self):
     logger.info("🚀 Starting periodic RSS collection task")
 
     try:
-        # Run async collection in sync context
-        result = asyncio.run(_async_collect_all())
+        # Run async collection in sync context with fresh event loop
+        result = _run_async(_async_collect_all())
 
         logger.info(f"✅ Periodic collection completed: {result}")
         return result
@@ -54,7 +64,7 @@ def collect_specific_sources(self, source_ids: List[str], triggered_by: str = "a
     logger.info(f"🔍 Starting on-demand collection for {len(source_ids)} sources")
 
     try:
-        result = asyncio.run(_async_collect_specific(source_ids, triggered_by, executed_by))
+        result = _run_async(_async_collect_specific(source_ids, triggered_by, executed_by))
 
         logger.info(f"✅ On-demand collection completed: {result}")
         return result
@@ -79,7 +89,7 @@ def collect_category(self, category_ids: List[str], triggered_by: str = "api"):
     logger.info(f"📚 Starting category collection for {len(category_ids)} categories")
 
     try:
-        result = asyncio.run(_async_collect_all(category_ids=category_ids, triggered_by=triggered_by))
+        result = _run_async(_async_collect_all(category_ids=category_ids, triggered_by=triggered_by))
 
         logger.info(f"✅ Category collection completed: {result}")
         return result

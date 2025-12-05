@@ -40,10 +40,10 @@ celery_app.conf.update(
 
     # Beat schedule (periodic tasks)
     beat_schedule={
-        # RSS collection - 2x per day (08:00 and 20:00 Brazil time)
+        # RSS collection - every 2 hours
         "collect-rss-feeds": {
             "task": "app.tasks.rss_tasks.collect_all_rss_feeds",
-            "schedule": crontab(minute=0, hour="8,20"),  # 08:00 and 20:00
+            "schedule": crontab(minute=0, hour="*/2"),  # Every 2 hours (00:00, 02:00, 04:00, ...)
         },
 
         # Malpedia Library RSS/BibTeX - DISABLED (run on-demand only via API)

@@ -18,12 +18,12 @@ logger = logging.getLogger(__name__)
 
 # Padrão de índices para mensagens do Telegram
 INDEX_PATTERN = "telegram_messages_*"
-INDEX_INFO = "telegram_info"
+INDEX_INFO = "telegram_groups"  # Index with group metadata
 
 
 async def get_group_title_from_info(es, group_username: str) -> Optional[str]:
     """
-    Busca o título do grupo no índice telegram_info
+    Busca o título do grupo no índice telegram_groups
 
     Args:
         es: Cliente Elasticsearch
@@ -33,12 +33,17 @@ async def get_group_title_from_info(es, group_username: str) -> Optional[str]:
         Título do grupo ou None se não encontrado
     """
     try:
+        # Try both field names: 'username' (from csv source) and 'group_username' (from scraper)
         response = await es.search(
             index=INDEX_INFO,
             body={
                 "query": {
-                    "term": {
-                        "username.keyword": group_username
+                    "bool": {
+                        "should": [
+                            {"term": {"username": group_username}},
+                            {"term": {"_id": group_username}}
+                        ],
+                        "minimum_should_match": 1
                     }
                 },
                 "size": 1
@@ -46,10 +51,12 @@ async def get_group_title_from_info(es, group_username: str) -> Optional[str]:
         )
 
         if response['hits']['total']['value'] > 0:
-            return response['hits']['hits'][0]['_source'].get('title')
+            source = response['hits']['hits'][0]['_source']
+            # Try different field names for title
+            return source.get('group_title') or source.get('name') or source.get('title')
         return None
     except Exception as e:
-        logger.warning(f"⚠️ Could not fetch group title from telegram_info: {e}")
+        logger.warning(f"⚠️ Could not fetch group title from telegram_groups: {e}")
         return None
 
 
@@ -160,7 +167,7 @@ class TelegramSearchService:
                         "minimum_should_match": 1
                     }
                 }
-                sort_order = [{"date": "desc"}]
+                sort_order = [{"date.keyword": "desc"}]
             else:
                 # Busca inteligente combinando match e wildcard
                 query = {
@@ -174,7 +181,7 @@ class TelegramSearchService:
                         "minimum_should_match": 1
                     }
                 }
-                sort_order = [{"_score": "desc"}, {"date": "desc"}]
+                sort_order = [{"_score": "desc"}, {"date.keyword": "desc"}]
 
             factory = ESClientFactory()
             es = await factory.get_client(server_id)
@@ -391,7 +398,7 @@ class TelegramSearchService:
                     "query": query,
                     "from": es_from,
                     "size": es_size,
-                    "sort": [{"date": "desc"}],
+                    "sort": [{"date.keyword": "desc"}],
                     "_source": ["id", "date", "message", "sender_info", "group_info"],
                     "track_total_hits": True
                 }
@@ -472,7 +479,7 @@ class TelegramSearchService:
                 body={
                     "query": query,
                     "size": 500,
-                    "sort": [{"date": "asc"}]
+                    "sort": [{"date.keyword": "asc"}]
                 }
             )
 
@@ -573,10 +580,11 @@ class TelegramSearchService:
 
             if period_days:
                 data_inicio = datetime.utcnow() - timedelta(days=period_days)
+                # Use date.keyword since date field is text type
                 query = {
                     "range": {
-                        "date": {
-                            "gte": data_inicio.isoformat() + "Z"
+                        "date.keyword": {
+                            "gte": data_inicio.strftime("%Y-%m-%d")
                         }
                     }
                 }
@@ -600,12 +608,12 @@ class TelegramSearchService:
                     "aggs": {
                         "total_grupos_unicos": {
                             "cardinality": {
-                                "field": "group_info.group_username"
+                                "field": "group_info.group_username.keyword"
                             }
                         },
                         "top_grupos": {
                             "terms": {
-                                "field": "group_info.group_username",
+                                "field": "group_info.group_username.keyword",
                                 "size": 20,
                                 "order": {"_count": "desc"}
                             },
@@ -651,7 +659,7 @@ class TelegramSearchService:
                             "aggs": {
                                 "username": {
                                     "terms": {
-                                        "field": "sender_info.username",
+                                        "field": "sender_info.username.keyword",
                                         "size": 1,
                                         "missing": "N/A"
                                     }
@@ -665,7 +673,7 @@ class TelegramSearchService:
                                 },
                                 "top_grupos": {
                                     "terms": {
-                                        "field": "group_info.group_username",
+                                        "field": "group_info.group_username.keyword",
                                         "size": 5,
                                         "order": {"_count": "desc"}
                                     },
@@ -715,20 +723,22 @@ class TelegramSearchService:
             Estatísticas do grupo
         """
         try:
+            # Use exact username (messages index preserves original case)
             query = {
                 "bool": {
                     "must": [
-                        {"term": {"group_info.group_username": group_username}}
+                        {"term": {"group_info.group_username.keyword": group_username}}
                     ]
                 }
             }
 
             if period_days:
                 data_inicio = datetime.utcnow() - timedelta(days=period_days)
+                # Use date.keyword since date field is text type
                 query["bool"]["must"].append({
                     "range": {
-                        "date": {
-                            "gte": data_inicio.isoformat() + "Z"
+                        "date.keyword": {
+                            "gte": data_inicio.strftime("%Y-%m-%d")
                         }
                     }
                 })
@@ -759,7 +769,7 @@ class TelegramSearchService:
                             },
                             "aggs": {
                                 "username": {
-                                    "terms": {"field": "sender_info.username", "size": 1, "missing": "N/A"}
+                                    "terms": {"field": "sender_info.username.keyword", "size": 1, "missing": "N/A"}
                                 },
                                 "full_name": {
                                     "terms": {"field": "sender_info.full_name.keyword", "size": 1, "missing": "Unknown"}
@@ -816,10 +826,11 @@ class TelegramSearchService:
 
             if period_days:
                 data_inicio = datetime.utcnow() - timedelta(days=period_days)
+                # Use date.keyword since date field is text type
                 query["bool"]["must"].append({
                     "range": {
-                        "date": {
-                            "gte": data_inicio.isoformat() + "Z"
+                        "date.keyword": {
+                            "gte": data_inicio.strftime("%Y-%m-%d")
                         }
                     }
                 })
@@ -843,7 +854,7 @@ class TelegramSearchService:
                     "aggs": {
                         "top_grupos": {
                             "terms": {
-                                "field": "group_info.group_username",
+                                "field": "group_info.group_username.keyword",
                                 "size": 20,
                                 "order": {"_count": "desc"}
                             },
@@ -854,7 +865,7 @@ class TelegramSearchService:
                             }
                         },
                         "username": {
-                            "terms": {"field": "sender_info.username", "size": 1, "missing": "N/A"}
+                            "terms": {"field": "sender_info.username.keyword", "size": 1, "missing": "N/A"}
                         },
                         "full_name": {
                             "terms": {"field": "sender_info.full_name.keyword", "size": 1, "missing": "Unknown"}
@@ -905,16 +916,34 @@ class TelegramSearchService:
             factory = ESClientFactory()
             es = await factory.get_client(server_id)
 
+            # telegram_groups has different field names depending on source
+            # - csv source: username, name
+            # - scraper source: group_username, group_title
             response = await es.search(
                 index=INDEX_INFO,
                 body={
                     "size": 10000,
-                    "sort": [{"title.keyword": "asc"}],
-                    "_source": ["title", "username", "id"]
+                    # No sort - ES default order is fine for listing groups
+                    "_source": ["username", "name", "group_title", "group_username", "group_id", "status", "total_messages_collected"]
                 }
             )
 
-            return response['hits']['hits']
+            # Normalize the response to have consistent field names
+            # Keep original case - messages index preserves original username case
+            normalized_hits = []
+            for hit in response['hits']['hits']:
+                source = hit['_source']
+                username_raw = source.get('username') or source.get('group_username') or hit['_id']
+                normalized = {
+                    'title': source.get('name') or source.get('group_title') or hit['_id'],
+                    'username': username_raw if username_raw else hit['_id'],
+                    'id': source.get('group_id'),
+                    'status': source.get('status'),
+                    'total_messages': source.get('total_messages_collected', 0)
+                }
+                normalized_hits.append({'_source': normalized})
+
+            return normalized_hits
 
         except Exception as e:
             logger.error(f"❌ Error listing groups: {e}")
@@ -941,6 +970,7 @@ class TelegramSearchService:
         """
         try:
             from_offset = (page - 1) * page_size
+            # Use exact username (messages index preserves original case)
 
             factory = ESClientFactory()
             es = await factory.get_client(server_id)
@@ -948,10 +978,10 @@ class TelegramSearchService:
             response = await es.search(
                 index=INDEX_PATTERN,
                 body={
-                    "query": {"term": {"group_info.group_username": group_username}},
+                    "query": {"term": {"group_info.group_username.keyword": group_username}},
                     "from": from_offset,
                     "size": page_size,
-                    "sort": [{"date": "desc"}],
+                    "sort": [{"date.keyword": "desc"}],
                     "_source": ["id", "date", "message", "sender_info", "group_info"]
                 }
             )
@@ -997,17 +1027,22 @@ class TelegramSearchService:
             factory = ESClientFactory()
             es = await factory.get_client(server_id)
 
-            # Query para filtrar últimos N dias
+            # Calculate date range manually since date field is text type
+            from datetime import datetime, timedelta
+            end_date = datetime.utcnow()
+            start_date = end_date - timedelta(days=days)
+
+            # Query para filtrar últimos N dias usando date.keyword
             query = {
                 "range": {
-                    "date": {
-                        "gte": f"now-{days}d/d",
-                        "lte": "now/d"
+                    "date.keyword": {
+                        "gte": start_date.strftime("%Y-%m-%d"),
+                        "lte": end_date.strftime("%Y-%m-%d")
                     }
                 }
             }
 
-            # Agregação por dia
+            # Agregação por dia usando terms em date.keyword (já que date é texto)
             response = await es.search(
                 index=INDEX_PATTERN,
                 body={
@@ -1015,10 +1050,9 @@ class TelegramSearchService:
                     "size": 0,
                     "aggs": {
                         "messages_per_day": {
-                            "date_histogram": {
-                                "field": "date",
-                                "calendar_interval": "day",
-                                "format": "yyyy-MM-dd",
+                            "terms": {
+                                "field": "date.keyword",
+                                "size": days + 1,
                                 "order": {"_key": "asc"}
                             }
                         }
@@ -1033,7 +1067,7 @@ class TelegramSearchService:
                 "days": days,
                 "timeline": [
                     {
-                        "date": bucket['key_as_string'],
+                        "date": bucket['key'][:10],  # Extract just the date part (YYYY-MM-DD)
                         "count": bucket['doc_count']
                     }
                     for bucket in buckets

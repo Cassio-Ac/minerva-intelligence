@@ -105,6 +105,7 @@ export const Header: React.FC = () => {
     { path: '/info', label: 'Info', iconImage: '/assets/icons/rss.png' },
     { path: '/leaks', label: 'Data Leaks', iconImage: '/assets/icons/dataleak.png' },
     { path: '/cves', label: 'CVEs', iconImage: '/assets/icons/cve.avif' },
+    { path: '/cpf', label: 'CPF', icon: '🪪' },
     { path: '/telegram', label: 'Telegram', iconImage: '/assets/icons/telegram.png' },
     { path: '/credentials', label: 'Credenciais', iconImage: '/assets/icons/creds.png' },
     { path: '/datalake', label: 'Data Lake', iconImage: '/assets/icons/data_lake.png' },

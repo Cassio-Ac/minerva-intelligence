@@ -14,6 +14,7 @@ import { HomePage } from '@pages/HomePage'
 import InfoPage from '@pages/InfoPage'
 import DataLeaksPage from '@pages/DataLeaksPage'
 import CVEPage from '@pages/CVEPage'
+import CPFPage from '@pages/CPFPage'
 import TelegramIntelligence from '@pages/TelegramIntelligence'
 import TelegramConversation from '@pages/TelegramConversation'
 import CTIDashboard from '@pages/cti/CTIDashboard'
@@ -127,6 +128,9 @@ function App() {
 
         {/* CVE Page */}
         <Route path="/cves" element={<ProtectedRoute><CVEPage /></ProtectedRoute>} />
+
+        {/* CPF Page */}
+        <Route path="/cpf" element={<ProtectedRoute><CPFPage /></ProtectedRoute>} />
 
         {/* Telegram Intelligence */}
         <Route path="/telegram" element={<ProtectedRoute><TelegramIntelligence /></ProtectedRoute>} />

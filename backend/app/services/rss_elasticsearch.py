@@ -360,13 +360,13 @@ class RSSElasticsearchService:
             # Aggregations for facets
             "aggs": {
                 "by_category": {
-                    "terms": {"field": "category", "size": 20}
+                    "terms": {"field": "category.keyword", "size": 20}
                 },
                 "by_feed": {
-                    "terms": {"field": "feed_name", "size": 50}
+                    "terms": {"field": "feed_name.keyword", "size": 50}
                 },
                 "by_tag": {
-                    "terms": {"field": "tags", "size": 30}
+                    "terms": {"field": "tags.keyword", "size": 30}
                 },
                 "by_date": {
                     "date_histogram": {
@@ -460,17 +460,22 @@ class RSSElasticsearchService:
                         }
                     },
                     "by_category": {
-                        "terms": {"field": "category", "size": 20}
+                        "terms": {"field": "category.keyword", "size": 20}
                     },
                     "top_feeds": {
-                        "terms": {"field": "feed_name", "size": 10, "order": {"_count": "desc"}}
+                        "terms": {"field": "feed_name.keyword", "size": 10, "order": {"_count": "desc"}}
                     },
                     "all_feeds": {
-                        "terms": {"field": "feed_name", "size": 100, "order": {"_key": "asc"}}
+                        "terms": {"field": "feed_name.keyword", "size": 100, "order": {"_key": "asc"}}
                     },
                     "timeline_30d": {
                         "filter": {
-                            "range": {"published": {"gte": days_30_ago.isoformat()}}
+                            "range": {
+                                "published": {
+                                    "gte": days_30_ago.isoformat(),
+                                    "lte": now.isoformat()  # Exclude future dates
+                                }
+                            }
                         },
                         "aggs": {
                             "daily_counts": {

@@ -89,12 +89,22 @@ async def search_credentials(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=10, le=200),
     domain_filter: Optional[str] = Query(default=None, description="Filtrar por domínio"),
-    complexity_filter: Optional[str] = Query(default=None, description="Filtrar por complexidade")
+    complexity_filter: Optional[str] = Query(default=None, description="Filtrar por complexidade"),
+    search_type: str = Query(default="wildcard", description="Tipo: wildcard (padrão) ou prefix (rápido)"),
+    field: str = Query(default="all", description="Campo: all, usuario, dominio_email, dominio_url")
 ):
     """
-    Busca credenciais no Data Lake.
+    Busca credenciais no Data Lake (230M+ documentos).
 
-    Busca em múltiplos campos: usuario, url, dominio_email, dominio_url
+    Tipos de busca:
+    - wildcard: Busca completa (ex: "riachuelo" encontra "joao@riachuelo.com.br") - 30-60s
+    - prefix: Busca rápida por prefixo (ex: "john" encontra "john@email.com") - ~1s
+
+    Campos:
+    - all: Busca em todos os campos
+    - usuario: Apenas no campo de usuário/email (mais rápido)
+    - dominio_email: Apenas no domínio do email
+    - dominio_url: Apenas no domínio da URL
     """
     import time
     start_time = time.time()
@@ -104,17 +114,38 @@ async def search_credentials(
 
         # Calcula offset
         offset = (page - 1) * page_size
+        q_lower = q.lower()
 
-        # Constrói query multi-match
+        # Define campos baseado no parâmetro field
+        if field == "usuario":
+            search_fields = ["usuario"]
+        elif field == "dominio_email":
+            search_fields = ["dominio_email"]
+        elif field == "dominio_url":
+            search_fields = ["dominio_url"]
+        else:  # all
+            search_fields = ["usuario", "dominio_email", "dominio_url"]
+
+        # Escolhe estratégia de busca baseada no tipo
+        if search_type == "wildcard":
+            # Busca wildcard - LENTA mas mais flexível
+            should_clauses = [
+                {"wildcard": {f: {"value": f"*{q_lower}*", "case_insensitive": True}}}
+                for f in search_fields
+            ]
+        else:
+            # Busca prefix - RÁPIDA (padrão)
+            should_clauses = []
+            for f in search_fields:
+                # Term exato (muito rápido)
+                should_clauses.append({"term": {f: {"value": q_lower, "boost": 10}}})
+                # Prefix (rápido)
+                should_clauses.append({"prefix": {f: {"value": q_lower, "boost": 3}}})
+
         must_clauses = [
             {
                 "bool": {
-                    "should": [
-                        {"wildcard": {"usuario": f"*{q.lower()}*"}},
-                        {"wildcard": {"url": f"*{q.lower()}*"}},
-                        {"wildcard": {"dominio_email": f"*{q.lower()}*"}},
-                        {"wildcard": {"dominio_url": f"*{q.lower()}*"}}
-                    ],
+                    "should": should_clauses,
                     "minimum_should_match": 1
                 }
             }
@@ -141,7 +172,7 @@ async def search_credentials(
             }
         }
 
-        # Executa busca
+        # Executa busca com timeout
         response = await client.search(
             index=INDEX_NAME,
             body={
@@ -156,7 +187,9 @@ async def search_credentials(
                     "usuario", "senha", "url", "dominio_email", "dominio_url",
                     "complexidade_senha", "forca_senha", "tamanho_senha",
                     "data_breach", "arquivo", "grupo_telegram", "padrao_detectado"
-                ]
+                ],
+                "timeout": "120s",  # 2 minutos para buscas wildcard em 230M docs
+                "track_total_hits": 10000  # Limita contagem para performance
             }
         )
 

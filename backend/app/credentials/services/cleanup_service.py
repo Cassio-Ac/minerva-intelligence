@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # Configurações
 RETENTION_DAYS = 7
-DOWNLOADS_DIR = Path("/Users/angellocassio/Documents/intelligence-platform/backend/downloads/credentials")
+DOWNLOADS_DIR = Path(__file__).parent.parent.parent.parent / "downloads" / "credentials"
 
 
 async def cleanup_expired_credentials():

@@ -48,7 +48,7 @@ class TelegramBotService:
     # Diretório base para sessões e downloads
     BASE_DIR = Path(__file__).parent.parent
     SESSIONS_DIR = BASE_DIR / "sessions"
-    DOWNLOADS_DIR = Path("/Users/angellocassio/Documents/intelligence-platform/backend/downloads/credentials")
+    DOWNLOADS_DIR = BASE_DIR.parent.parent / "downloads" / "credentials"
 
     def __init__(self):
         """Inicializa o serviço com as configurações do ambiente"""
