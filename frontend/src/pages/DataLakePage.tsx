@@ -1,20 +1,20 @@
 /**
- * DataLakePage - Consulta de Credenciais no Data Lake
+ * DataLakePage - Consulta de Credenciais no Data Lake (420M+ documentos)
  *
  * Features:
- * - Collapsible timeline chart (top)
- * - Search across ~100M leaked credentials
- * - Statistics sidebar
- * - Top domains
- * - Pagination
- * - Copy to clipboard
+ * - Busca otimizada com detecção automática de tipo
+ * - Tabs de modo de busca (Domínio Email, Domínio URL, Email Exato, Busca Livre)
+ * - Contador rápido antes de carregar resultados
+ * - Indicadores de performance
+ * - Paginação otimizada
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@services/api';
 import { useSettingsStore } from '@stores/settingsStore';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+// Types
 interface CredentialResult {
   usuario: string;
   senha: string;
@@ -30,14 +30,26 @@ interface CredentialResult {
   padrao_detectado: string | null;
 }
 
-interface SearchResponse {
+interface CountResponse {
+  count: number;
+  query: string;
+  mode: string;
+  detected_type: string;
+  search_time_ms: number;
+  estimated_load_time: string;
+}
+
+interface SearchV2Response {
   total: number;
   page: number;
   page_size: number;
   total_pages: number;
   results: CredentialResult[];
   query: string;
+  mode: string;
+  detected_type: string;
   search_time_ms: number;
+  timed_out: boolean;
 }
 
 interface DataLakeStats {
@@ -60,13 +72,27 @@ interface TopDomain {
   count: number;
 }
 
+type SearchMode = 'auto' | 'email_domain' | 'url_domain' | 'email_exact' | 'contains';
+
+const SEARCH_MODES: { value: SearchMode; label: string; description: string; icon: string }[] = [
+  { value: 'auto', label: 'Auto', description: 'Detecta automaticamente', icon: '🔮' },
+  { value: 'email_domain', label: 'Domínio Email', description: '@empresa.com.br', icon: '📧' },
+  { value: 'url_domain', label: 'Domínio URL', description: 'site.com', icon: '🌐' },
+  { value: 'email_exact', label: 'Email Exato', description: 'joao@empresa.com', icon: '🎯' },
+  { value: 'contains', label: 'Busca Livre', description: 'Qualquer termo (lento)', icon: '🔍' },
+];
+
 const DataLakePage: React.FC = () => {
   const { currentColors } = useSettingsStore();
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchMode, setSearchMode] = useState<SearchMode>('auto');
   const [isSearching, setIsSearching] = useState<boolean>(false);
-  const [searchResults, setSearchResults] = useState<SearchResponse | null>(null);
+  const [isCounting, setIsCounting] = useState<boolean>(false);
+  const [searchResults, setSearchResults] = useState<SearchV2Response | null>(null);
+  const [countResult, setCountResult] = useState<CountResponse | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
@@ -79,7 +105,7 @@ const DataLakePage: React.FC = () => {
   // UI state
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [showPasswords, setShowPasswords] = useState<boolean>(false);
-  const [showTimeline, setShowTimeline] = useState<boolean>(true);
+  const [showTimeline, setShowTimeline] = useState<boolean>(false);
 
   // Fetch stats
   const fetchStats = useCallback(async () => {
@@ -104,36 +130,86 @@ const DataLakePage: React.FC = () => {
   // Fetch top domains
   const fetchTopDomains = useCallback(async () => {
     try {
-      const response = await api.get<{ domains: TopDomain[] }>('/credentials/datalake/top-domains?domain_type=url&limit=10');
+      const response = await api.get<{ domains: TopDomain[] }>('/credentials/datalake/top-domains?domain_type=email&limit=10');
       setTopDomains(response.data.domains);
     } catch (error) {
       console.error('Error fetching top domains:', error);
     }
   }, []);
 
-  // Search credentials
-  const searchCredentials = useCallback(async (page: number = 1) => {
-    if (!searchQuery.trim() || searchQuery.trim().length < 3) {
-      setSearchError('Digite pelo menos 3 caracteres para buscar');
+  // Count credentials (fast)
+  const countCredentials = useCallback(async () => {
+    if (!searchQuery.trim() || searchQuery.trim().length < 2) {
+      setSearchError('Digite pelo menos 2 caracteres');
       return;
     }
+
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    setIsCounting(true);
+    setSearchError(null);
+    setCountResult(null);
+    setSearchResults(null);
+
+    try {
+      const response = await api.post<CountResponse>(
+        '/credentials/datalake/count',
+        { query: searchQuery.trim(), mode: searchMode },
+        { signal: abortControllerRef.current.signal }
+      );
+      setCountResult(response.data);
+    } catch (error: any) {
+      if (error.name !== 'CanceledError') {
+        console.error('Error counting:', error);
+        setSearchError(error.response?.data?.detail || 'Erro ao contar credenciais');
+      }
+    } finally {
+      setIsCounting(false);
+    }
+  }, [searchQuery, searchMode]);
+
+  // Search credentials (with results)
+  const searchCredentials = useCallback(async (page: number = 1) => {
+    if (!searchQuery.trim() || searchQuery.trim().length < 2) {
+      setSearchError('Digite pelo menos 2 caracteres');
+      return;
+    }
+
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
 
     setIsSearching(true);
     setSearchError(null);
 
     try {
-      const response = await api.get<SearchResponse>(
-        `/credentials/datalake/search?q=${encodeURIComponent(searchQuery.trim())}&page=${page}&page_size=50`
+      const response = await api.post<SearchV2Response>(
+        '/credentials/datalake/search-v2',
+        {
+          query: searchQuery.trim(),
+          mode: searchMode,
+          page,
+          page_size: 50
+        },
+        { signal: abortControllerRef.current.signal }
       );
       setSearchResults(response.data);
       setCurrentPage(page);
     } catch (error: any) {
-      console.error('Error searching:', error);
-      setSearchError(error.response?.data?.detail || 'Erro ao buscar credenciais');
+      if (error.name !== 'CanceledError') {
+        console.error('Error searching:', error);
+        setSearchError(error.response?.data?.detail || 'Erro ao buscar credenciais');
+      }
     } finally {
       setIsSearching(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, searchMode]);
 
   // Copy to clipboard
   const copyToClipboard = useCallback((text: string, index: number) => {
@@ -157,6 +233,29 @@ const DataLakePage: React.FC = () => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toLocaleString('pt-BR');
+  };
+
+  // Get performance badge
+  const getPerformanceBadge = (detectedType: string) => {
+    switch (detectedType) {
+      case 'email_exact':
+        return { text: '⚡ Instantâneo', color: '#22c55e' };
+      case 'email_domain':
+      case 'url_domain':
+        return { text: '⚡ Muito Rápido', color: '#22c55e' };
+      case 'generic':
+        return { text: '⏱️ Pode demorar', color: '#f97316' };
+      default:
+        return { text: '🔍 Buscando', color: '#3b82f6' };
+    }
+  };
+
+  // Handle domain click from sidebar
+  const handleDomainClick = (domain: string) => {
+    setSearchQuery(domain);
+    setSearchMode('email_domain');
+    setCountResult(null);
+    setSearchResults(null);
   };
 
   return (
@@ -185,13 +284,20 @@ const DataLakePage: React.FC = () => {
           alignItems: 'center',
           marginBottom: showTimeline ? '8px' : '0'
         }}>
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <h3 style={{ margin: '0', color: currentColors.text.primary, fontSize: '14px' }}>
-              Timeline de Vazamentos (12 Meses)
+              🔐 Data Lake - Credenciais Vazadas
             </h3>
-            {!showTimeline && stats && (
-              <span style={{ fontSize: '12px', color: currentColors.text.secondary, marginLeft: '12px' }}>
-                {formatNumber(stats.total_credentials)} credenciais indexadas
+            {stats && (
+              <span style={{
+                padding: '4px 8px',
+                backgroundColor: '#f9731633',
+                color: '#f97316',
+                borderRadius: '4px',
+                fontSize: '12px',
+                fontWeight: '600'
+              }}>
+                {formatNumber(stats.total_credentials)} registros
               </span>
             )}
           </div>
@@ -220,62 +326,32 @@ const DataLakePage: React.FC = () => {
                 borderRadius: '6px',
                 color: currentColors.text.secondary,
                 cursor: 'pointer',
-                fontSize: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
+                fontSize: '12px'
               }}
             >
-              {showTimeline ? '▲ Ocultar' : '▼ Mostrar'}
+              {showTimeline ? '▲ Timeline' : '▼ Timeline'}
             </button>
           </div>
         </div>
-        {showTimeline && (
-          timeline.length > 0 ? (
-            <div style={{ height: '150px', width: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={timeline}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={currentColors.border.default} />
-                  <XAxis
-                    dataKey="date"
-                    stroke={currentColors.text.secondary}
-                    tick={{ fill: currentColors.text.secondary, fontSize: 11 }}
-                  />
-                  <YAxis
-                    stroke={currentColors.text.secondary}
-                    tick={{ fill: currentColors.text.secondary, fontSize: 11 }}
-                    tickFormatter={formatNumber}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: currentColors.bg.secondary,
-                      border: `1px solid ${currentColors.border.default}`,
-                      borderRadius: '8px',
-                      color: currentColors.text.primary
-                    }}
-                    formatter={(value: number) => [formatNumber(value), 'Credenciais']}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="count"
-                    stroke="#f97316"
-                    strokeWidth={2}
-                    fill="#f9731633"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div style={{
-              height: '150px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: currentColors.text.secondary
-            }}>
-              Carregando timeline...
-            </div>
-          )
+        {showTimeline && timeline.length > 0 && (
+          <div style={{ height: '120px', width: '100%' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={timeline}>
+                <CartesianGrid strokeDasharray="3 3" stroke={currentColors.border.default} />
+                <XAxis dataKey="date" stroke={currentColors.text.secondary} tick={{ fontSize: 10 }} />
+                <YAxis stroke={currentColors.text.secondary} tick={{ fontSize: 10 }} tickFormatter={formatNumber} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: currentColors.bg.secondary,
+                    border: `1px solid ${currentColors.border.default}`,
+                    borderRadius: '8px'
+                  }}
+                  formatter={(value: number) => [formatNumber(value), 'Credenciais']}
+                />
+                <Area type="monotone" dataKey="count" stroke="#f97316" fill="#f9731633" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
 
@@ -297,18 +373,58 @@ const DataLakePage: React.FC = () => {
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
-          {/* Search Form */}
+          {/* Search Mode Tabs */}
           <div style={{
-            padding: '12px',
-            borderBottom: `1px solid ${currentColors.border.default}`
+            display: 'flex',
+            gap: '4px',
+            padding: '8px 12px',
+            borderBottom: `1px solid ${currentColors.border.default}`,
+            overflowX: 'auto'
           }}>
+            {SEARCH_MODES.map((mode) => (
+              <button
+                key={mode.value}
+                onClick={() => {
+                  setSearchMode(mode.value);
+                  setCountResult(null);
+                  setSearchResults(null);
+                }}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: searchMode === mode.value ? '#f97316' : currentColors.bg.tertiary,
+                  color: searchMode === mode.value ? '#fff' : currentColors.text.secondary,
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                title={mode.description}
+              >
+                <span>{mode.icon}</span>
+                <span>{mode.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Search Form */}
+          <div style={{ padding: '12px', borderBottom: `1px solid ${currentColors.border.default}` }}>
             <div style={{ display: 'flex', gap: '8px' }}>
               <input
                 type="text"
-                placeholder="Buscar por empresa, dominio, email, usuario..."
+                placeholder={
+                  searchMode === 'email_domain' ? 'Digite o domínio (ex: riachuelo.com.br)' :
+                  searchMode === 'url_domain' ? 'Digite o domínio do site (ex: facebook.com)' :
+                  searchMode === 'email_exact' ? 'Digite o email completo (ex: joao@empresa.com)' :
+                  searchMode === 'contains' ? 'Digite qualquer termo (busca ampla)' :
+                  'Digite domínio, email ou termo para buscar...'
+                }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && searchCredentials(1)}
+                onKeyPress={(e) => e.key === 'Enter' && countCredentials()}
                 style={{
                   flex: 1,
                   padding: '12px 16px',
@@ -320,23 +436,26 @@ const DataLakePage: React.FC = () => {
                 }}
               />
               <button
-                onClick={() => searchCredentials(1)}
-                disabled={isSearching || searchQuery.trim().length < 3}
+                onClick={countCredentials}
+                disabled={isCounting || searchQuery.trim().length < 2}
                 style={{
-                  padding: '12px 24px',
+                  padding: '12px 20px',
                   backgroundColor: '#f97316',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '6px',
-                  cursor: (isSearching || searchQuery.trim().length < 3) ? 'not-allowed' : 'pointer',
+                  cursor: (isCounting || searchQuery.trim().length < 2) ? 'not-allowed' : 'pointer',
                   fontWeight: '600',
                   fontSize: '14px',
-                  opacity: (isSearching || searchQuery.trim().length < 3) ? 0.6 : 1
+                  opacity: (isCounting || searchQuery.trim().length < 2) ? 0.6 : 1,
+                  whiteSpace: 'nowrap'
                 }}
               >
-                {isSearching ? 'Buscando...' : 'Buscar'}
+                {isCounting ? '...' : '🔍 Buscar'}
               </button>
             </div>
+
+            {/* Error */}
             {searchError && (
               <div style={{
                 marginTop: '8px',
@@ -347,6 +466,60 @@ const DataLakePage: React.FC = () => {
                 fontSize: '12px'
               }}>
                 {searchError}
+              </div>
+            )}
+
+            {/* Count Result */}
+            {countResult && !searchResults && (
+              <div style={{
+                marginTop: '12px',
+                padding: '16px',
+                backgroundColor: currentColors.bg.tertiary,
+                borderRadius: '8px',
+                border: `1px solid ${currentColors.border.default}`
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '12px', color: currentColors.text.secondary, marginBottom: '4px' }}>
+                      Resultados encontrados para "{countResult.query}"
+                    </div>
+                    <div style={{ fontSize: '28px', fontWeight: '700', color: '#f97316' }}>
+                      {formatNumber(countResult.count)}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{
+                      padding: '4px 8px',
+                      backgroundColor: getPerformanceBadge(countResult.detected_type).color + '33',
+                      color: getPerformanceBadge(countResult.detected_type).color,
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      marginBottom: '4px'
+                    }}>
+                      {getPerformanceBadge(countResult.detected_type).text}
+                    </div>
+                    <div style={{ fontSize: '11px', color: currentColors.text.secondary }}>
+                      Tipo: {countResult.detected_type} ({countResult.search_time_ms}ms)
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => searchCredentials(1)}
+                  disabled={isSearching}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    backgroundColor: '#f97316',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: isSearching ? 'not-allowed' : 'pointer',
+                    fontWeight: '600',
+                    fontSize: '14px'
+                  }}
+                >
+                  {isSearching ? 'Carregando resultados...' : `Carregar Resultados (${countResult.estimated_load_time})`}
+                </button>
               </div>
             )}
           </div>
@@ -365,11 +538,27 @@ const DataLakePage: React.FC = () => {
                   borderBottom: `1px solid ${currentColors.border.default}`
                 }}>
                   <div style={{ fontSize: '13px', color: currentColors.text.secondary }}>
-                    <strong style={{ color: '#f97316' }}>{searchResults.total.toLocaleString('pt-BR')}</strong> resultados para "{searchResults.query}"
-                    <span style={{ marginLeft: '8px', opacity: 0.7 }}>({searchResults.search_time_ms}ms)</span>
+                    <strong style={{ color: '#f97316' }}>{searchResults.total.toLocaleString('pt-BR')}</strong> resultados
+                    <span style={{ marginLeft: '8px', opacity: 0.7 }}>
+                      ({searchResults.search_time_ms}ms)
+                    </span>
+                    {searchResults.timed_out && (
+                      <span style={{ marginLeft: '8px', color: '#f97316' }}>⚠️ Timeout parcial</span>
+                    )}
                   </div>
-                  <div style={{ fontSize: '12px', color: currentColors.text.secondary }}>
-                    Pagina {searchResults.page} de {searchResults.total_pages}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      padding: '2px 6px',
+                      backgroundColor: getPerformanceBadge(searchResults.detected_type).color + '33',
+                      color: getPerformanceBadge(searchResults.detected_type).color,
+                      borderRadius: '4px',
+                      fontSize: '10px'
+                    }}>
+                      {searchResults.detected_type}
+                    </span>
+                    <span style={{ fontSize: '12px', color: currentColors.text.secondary }}>
+                      Pag {searchResults.page}/{searchResults.total_pages}
+                    </span>
                   </div>
                 </div>
 
@@ -397,11 +586,7 @@ const DataLakePage: React.FC = () => {
                           <div style={{ color: currentColors.text.secondary, marginBottom: '2px', fontSize: '10px' }}>
                             USUARIO
                           </div>
-                          <div style={{
-                            fontFamily: 'monospace',
-                            color: '#3b82f6',
-                            wordBreak: 'break-all'
-                          }}>
+                          <div style={{ fontFamily: 'monospace', color: '#3b82f6', wordBreak: 'break-all' }}>
                             {cred.usuario}
                           </div>
                         </div>
@@ -433,24 +618,26 @@ const DataLakePage: React.FC = () => {
                                 color: copiedIndex === index ? '#fff' : currentColors.text.secondary
                               }}
                             >
-                              {copiedIndex === index ? 'Copiado!' : 'Copiar'}
+                              {copiedIndex === index ? '✓' : 'Copiar'}
                             </button>
                           </div>
                         </div>
 
                         {/* Source */}
                         <div style={{ textAlign: 'right' }}>
-                          {cred.dominio_url && (
-                            <span style={{
-                              padding: '2px 6px',
-                              backgroundColor: '#f9731633',
-                              color: '#f97316',
-                              borderRadius: '4px',
-                              fontSize: '10px'
-                            }}>
-                              {cred.dominio_url.length > 25
-                                ? cred.dominio_url.substring(0, 25) + '...'
-                                : cred.dominio_url}
+                          {cred.dominio_email && (
+                            <span
+                              onClick={() => handleDomainClick(cred.dominio_email!)}
+                              style={{
+                                padding: '2px 6px',
+                                backgroundColor: '#3b82f633',
+                                color: '#3b82f6',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              @{cred.dominio_email.length > 20 ? cred.dominio_email.substring(0, 20) + '...' : cred.dominio_email}
                             </span>
                           )}
                         </div>
@@ -466,7 +653,7 @@ const DataLakePage: React.FC = () => {
                           fontSize: '11px',
                           wordBreak: 'break-all'
                         }}>
-                          <strong>URL:</strong> {cred.url.length > 100 ? cred.url.substring(0, 100) + '...' : cred.url}
+                          <strong>URL:</strong> {cred.url.length > 80 ? cred.url.substring(0, 80) + '...' : cred.url}
                         </div>
                       )}
                     </div>
@@ -496,13 +683,9 @@ const DataLakePage: React.FC = () => {
                         opacity: currentPage <= 1 ? 0.5 : 1
                       }}
                     >
-                      Anterior
+                      ← Anterior
                     </button>
-                    <span style={{
-                      padding: '8px 16px',
-                      color: currentColors.text.secondary,
-                      fontSize: '13px'
-                    }}>
+                    <span style={{ padding: '8px 16px', color: currentColors.text.secondary, fontSize: '13px' }}>
                       {currentPage} / {searchResults.total_pages}
                     </span>
                     <button
@@ -518,12 +701,12 @@ const DataLakePage: React.FC = () => {
                         opacity: currentPage >= searchResults.total_pages ? 0.5 : 1
                       }}
                     >
-                      Proxima
+                      Próxima →
                     </button>
                   </div>
                 )}
               </>
-            ) : (
+            ) : !countResult && (
               <div style={{
                 height: '100%',
                 display: 'flex',
@@ -536,8 +719,20 @@ const DataLakePage: React.FC = () => {
                 <div style={{ fontSize: '14px', marginBottom: '4px' }}>
                   Busque credenciais vazadas
                 </div>
-                <div style={{ fontSize: '12px', textAlign: 'center', maxWidth: '300px' }}>
-                  Digite o nome da empresa, dominio, email ou usuario para buscar no Data Lake
+                <div style={{ fontSize: '12px', textAlign: 'center', maxWidth: '300px', marginBottom: '16px' }}>
+                  Selecione o modo de busca e digite o termo. Para buscas por domínio, use o modo "Domínio Email".
+                </div>
+                <div style={{
+                  padding: '12px',
+                  backgroundColor: currentColors.bg.tertiary,
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  color: currentColors.text.secondary
+                }}>
+                  <div><strong>Dicas de busca:</strong></div>
+                  <div>• Domínio: riachuelo.com.br</div>
+                  <div>• Email: joao@empresa.com</div>
+                  <div>• Genérico: nome_empresa</div>
                 </div>
               </div>
             )}
@@ -555,7 +750,7 @@ const DataLakePage: React.FC = () => {
           overflow: 'auto'
         }}>
           <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', color: currentColors.text.primary }}>
-            Estatisticas do Data Lake
+            Estatísticas
           </h3>
 
           {loadingStats ? (
@@ -586,7 +781,7 @@ const DataLakePage: React.FC = () => {
                     borderRadius: '6px'
                   }}>
                     <div style={{ fontSize: '10px', color: currentColors.text.secondary, marginBottom: '2px' }}>
-                      DOMINIOS URL
+                      DOMÍNIOS URL
                     </div>
                     <div style={{ fontSize: '16px', fontWeight: '600', color: '#3b82f6' }}>
                       {formatNumber(stats.unique_domains)}
@@ -598,7 +793,7 @@ const DataLakePage: React.FC = () => {
                     borderRadius: '6px'
                   }}>
                     <div style={{ fontSize: '10px', color: currentColors.text.secondary, marginBottom: '2px' }}>
-                      DOMINIOS EMAIL
+                      DOMÍNIOS EMAIL
                     </div>
                     <div style={{ fontSize: '16px', fontWeight: '600', color: '#22c55e' }}>
                       {formatNumber(stats.unique_email_domains)}
@@ -612,7 +807,7 @@ const DataLakePage: React.FC = () => {
                   borderRadius: '6px'
                 }}>
                   <div style={{ fontSize: '10px', color: currentColors.text.secondary, marginBottom: '2px' }}>
-                    FORCA MEDIA DAS SENHAS
+                    FORÇA MÉDIA DAS SENHAS
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{
@@ -637,46 +832,17 @@ const DataLakePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* By Pattern */}
-              <div style={{ marginBottom: '16px' }}>
-                <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', color: currentColors.text.primary }}>
-                  Por Padrao
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {Object.entries(stats.by_pattern).map(([pattern, count]) => (
-                    <div
-                      key={pattern}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '6px 8px',
-                        backgroundColor: currentColors.bg.tertiary,
-                        borderRadius: '4px',
-                        fontSize: '11px'
-                      }}
-                    >
-                      <span style={{ color: '#f97316', fontFamily: 'monospace' }}>{pattern}</span>
-                      <span style={{ color: currentColors.text.secondary }}>{formatNumber(count)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* Top Domains */}
               {topDomains.length > 0 && (
                 <div>
                   <h4 style={{ margin: '0 0 8px 0', fontSize: '12px', color: currentColors.text.primary }}>
-                    Top Dominios Vazados
+                    Top Domínios de Email
                   </h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {topDomains.slice(0, 8).map((domain, index) => (
+                    {topDomains.slice(0, 10).map((domain, index) => (
                       <div
                         key={domain.domain}
-                        onClick={() => {
-                          setSearchQuery(domain.domain);
-                          searchCredentials(1);
-                        }}
+                        onClick={() => handleDomainClick(domain.domain)}
                         style={{
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -689,12 +855,12 @@ const DataLakePage: React.FC = () => {
                           transition: 'all 0.2s'
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = '#f97316';
                           e.currentTarget.style.backgroundColor = currentColors.bg.primary;
+                          e.currentTarget.style.transform = 'translateX(2px)';
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = 'transparent';
                           e.currentTarget.style.backgroundColor = currentColors.bg.tertiary;
+                          e.currentTarget.style.transform = 'translateX(0)';
                         }}
                       >
                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -713,7 +879,7 @@ const DataLakePage: React.FC = () => {
                             {index + 1}
                           </span>
                           <span style={{ color: currentColors.text.primary }}>
-                            {domain.domain.length > 20 ? domain.domain.substring(0, 20) + '...' : domain.domain}
+                            {domain.domain.length > 18 ? domain.domain.substring(0, 18) + '...' : domain.domain}
                           </span>
                         </span>
                         <span style={{ color: currentColors.text.secondary }}>{formatNumber(domain.count)}</span>

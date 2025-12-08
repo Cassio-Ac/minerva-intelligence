@@ -1,19 +1,26 @@
 """
 API Endpoints para Consulta de Credenciais no Data Lake (Elasticsearch)
 
-Endpoints:
+Endpoints Otimizados (420M+ documentos):
+- POST /credentials/datalake/count - Contador rápido de resultados
+- POST /credentials/datalake/search-v2 - Busca inteligente com detecção automática
+- GET /credentials/datalake/by-domain/{domain} - Busca otimizada por domínio
+
+Endpoints Legacy:
 - GET /credentials/datalake/search - Busca credenciais por termo
 - GET /credentials/datalake/stats - Estatísticas do Data Lake
 - GET /credentials/datalake/timeline - Timeline de ingestão
 - GET /credentials/datalake/top-domains - Top domínios vazados
-- GET /credentials/datalake/by-domain - Busca por domínio específico
 """
 
 import logging
+import re
+import time
 from datetime import datetime, timedelta
-from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from typing import Optional, List, Literal
+from fastapi import APIRouter, HTTPException, Query, Path
+from pydantic import BaseModel, Field
+from enum import Enum
 
 from app.db.elasticsearch import ElasticsearchClient
 
@@ -23,6 +30,114 @@ router = APIRouter(prefix="/credentials/datalake", tags=["Credentials - Data Lak
 
 # Index name
 INDEX_NAME = "leaked_credentials"
+
+
+# ============================================================
+# Enums e Tipos
+# ============================================================
+
+class SearchMode(str, Enum):
+    AUTO = "auto"
+    EMAIL_DOMAIN = "email_domain"
+    URL_DOMAIN = "url_domain"
+    EMAIL_EXACT = "email_exact"
+    CONTAINS = "contains"
+
+
+class QueryType(str, Enum):
+    """Tipo de query detectado automaticamente"""
+    EMAIL_EXACT = "email_exact"      # joao@empresa.com -> term query
+    EMAIL_DOMAIN = "email_domain"    # @empresa.com ou empresa.com -> term em dominio_email
+    URL_DOMAIN = "url_domain"        # site.com -> term em dominio_url
+    GENERIC = "generic"              # texto livre -> wildcard limitado
+
+
+# ============================================================
+# Funções de Detecção e Otimização
+# ============================================================
+
+def detect_query_type(query: str) -> tuple[QueryType, str]:
+    """
+    Detecta o tipo de busca ideal baseado no padrão do query.
+    Retorna (tipo, valor_normalizado)
+    """
+    q = query.strip().lower()
+
+    # Domínio de email com @: @empresa.com ou @empresa.com.br
+    # DEVE vir antes da verificação de email completo!
+    if q.startswith('@') and '.' in q:
+        return QueryType.EMAIL_DOMAIN, q[1:]  # Remove @
+
+    # Email completo: joao@empresa.com (tem algo ANTES do @)
+    if '@' in q and not q.startswith('@'):
+        parts = q.split('@')
+        if len(parts) == 2 and parts[0] and '.' in parts[1]:
+            return QueryType.EMAIL_EXACT, q
+
+    # Parece domínio (tem . e parece TLD)
+    domain_pattern = r'^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
+    if re.match(domain_pattern, q):
+        # Pode ser email domain ou url domain - prioriza email
+        return QueryType.EMAIL_DOMAIN, q
+
+    # Genérico
+    return QueryType.GENERIC, q
+
+
+def build_optimized_query(query: str, mode: SearchMode) -> tuple[dict, str, int]:
+    """
+    Constrói query ES otimizada baseada no modo.
+    Retorna (query_dict, tipo_detectado, timeout_seconds)
+    """
+    q = query.strip().lower()
+
+    if mode == SearchMode.AUTO:
+        query_type, normalized = detect_query_type(q)
+    elif mode == SearchMode.EMAIL_DOMAIN:
+        query_type, normalized = QueryType.EMAIL_DOMAIN, q.lstrip('@')
+    elif mode == SearchMode.URL_DOMAIN:
+        query_type, normalized = QueryType.URL_DOMAIN, q
+    elif mode == SearchMode.EMAIL_EXACT:
+        query_type, normalized = QueryType.EMAIL_EXACT, q
+    else:  # CONTAINS
+        query_type, normalized = QueryType.GENERIC, q
+
+    # Constrói query baseada no tipo
+    if query_type == QueryType.EMAIL_EXACT:
+        # Term query - instantânea
+        return {
+            "term": {"usuario": normalized}
+        }, "email_exact", 10
+
+    elif query_type == QueryType.EMAIL_DOMAIN:
+        # Term em dominio_email - muito rápida
+        return {
+            "term": {"dominio_email": normalized}
+        }, "email_domain", 30
+
+    elif query_type == QueryType.URL_DOMAIN:
+        # Term em dominio_url - muito rápida
+        return {
+            "term": {"dominio_url": normalized}
+        }, "url_domain", 30
+
+    else:  # GENERIC
+        # Busca otimizada com boost e limite
+        return {
+            "bool": {
+                "should": [
+                    # Match exato em domínios (mais relevante)
+                    {"term": {"dominio_email": {"value": normalized, "boost": 10}}},
+                    {"term": {"dominio_url": {"value": normalized, "boost": 10}}},
+                    # Prefix em usuario (rápido)
+                    {"prefix": {"usuario": {"value": normalized, "boost": 5}}},
+                    # Wildcard limitado (mais lento)
+                    {"wildcard": {"dominio_email": {"value": f"*{normalized}*", "boost": 2}}},
+                    {"wildcard": {"dominio_url": {"value": f"*{normalized}*", "boost": 1}}},
+                ],
+                "minimum_should_match": 1
+            }
+        }, "generic", 60
 
 
 # ============================================================
@@ -56,6 +171,48 @@ class SearchResponse(BaseModel):
     search_time_ms: int
 
 
+# ============================================================
+# Schemas V2 - Otimizados
+# ============================================================
+
+class CountRequest(BaseModel):
+    """Request para contagem rápida"""
+    query: str = Field(..., min_length=2, description="Termo de busca")
+    mode: SearchMode = Field(default=SearchMode.AUTO, description="Modo de busca")
+
+
+class CountResponse(BaseModel):
+    """Response da contagem"""
+    count: int
+    query: str
+    mode: str
+    detected_type: str
+    search_time_ms: int
+    estimated_load_time: str
+
+
+class SearchV2Request(BaseModel):
+    """Request para busca otimizada"""
+    query: str = Field(..., min_length=2, description="Termo de busca")
+    mode: SearchMode = Field(default=SearchMode.AUTO, description="Modo de busca")
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=50, ge=10, le=200)
+
+
+class SearchV2Response(BaseModel):
+    """Response da busca otimizada"""
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    results: List[CredentialResult]
+    query: str
+    mode: str
+    detected_type: str
+    search_time_ms: int
+    timed_out: bool = False
+
+
 class DataLakeStats(BaseModel):
     """Estatísticas do Data Lake"""
     total_credentials: int
@@ -80,7 +237,258 @@ class TopDomainItem(BaseModel):
 
 
 # ============================================================
-# Search Endpoint
+# NOVOS ENDPOINTS OTIMIZADOS (V2)
+# ============================================================
+
+@router.post("/count", response_model=CountResponse)
+async def count_credentials(request: CountRequest):
+    """
+    Conta credenciais rapidamente sem retornar dados.
+    Ideal para mostrar ao usuário quantos resultados existem antes de carregar.
+
+    Performance:
+    - Domínio de email: ~50ms
+    - Email exato: ~10ms
+    - Busca genérica: ~1-5s
+    """
+    start_time = time.time()
+
+    try:
+        client = ElasticsearchClient.get_client()
+
+        # Constrói query otimizada
+        es_query, detected_type, timeout_sec = build_optimized_query(
+            request.query, request.mode
+        )
+
+        # Executa count (mais rápido que search)
+        response = await client.count(
+            index=INDEX_NAME,
+            body={"query": es_query}
+        )
+
+        count = response["count"]
+        search_time = int((time.time() - start_time) * 1000)
+
+        # Estima tempo de carregamento baseado no tipo
+        if detected_type in ["email_exact", "email_domain", "url_domain"]:
+            estimated = "<1s"
+        elif count > 100000:
+            estimated = "30-60s"
+        elif count > 10000:
+            estimated = "5-15s"
+        else:
+            estimated = "1-5s"
+
+        logger.info(f"📊 Count '{request.query}' [{detected_type}]: {count} em {search_time}ms")
+
+        return CountResponse(
+            count=count,
+            query=request.query,
+            mode=request.mode.value,
+            detected_type=detected_type,
+            search_time_ms=search_time,
+            estimated_load_time=estimated
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Erro no count: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/search-v2", response_model=SearchV2Response)
+async def search_credentials_v2(request: SearchV2Request):
+    """
+    Busca otimizada com detecção automática do melhor tipo de query.
+
+    Modos:
+    - auto: Detecta automaticamente (recomendado)
+    - email_domain: Busca por domínio de email (@empresa.com)
+    - url_domain: Busca por domínio de URL (site.com)
+    - email_exact: Busca email exato (joao@empresa.com)
+    - contains: Busca genérica (pode ser lenta)
+
+    Performance por tipo:
+    - email_exact: ~10ms
+    - email_domain/url_domain: ~100ms
+    - contains/generic: 5-60s (limitado)
+    """
+    start_time = time.time()
+
+    try:
+        client = ElasticsearchClient.get_client()
+
+        # Constrói query otimizada
+        es_query, detected_type, timeout_sec = build_optimized_query(
+            request.query, request.mode
+        )
+
+        offset = (request.page - 1) * request.page_size
+
+        # Configurações baseadas no tipo de busca
+        if detected_type == "generic":
+            # Busca genérica: limita resultados e usa terminate_after
+            track_total = 50000
+            terminate_after = 50000
+        else:
+            # Buscas otimizadas: pode contar todos
+            track_total = True
+            terminate_after = None
+
+        # Monta body da query
+        body = {
+            "query": es_query,
+            "from": offset,
+            "size": request.page_size,
+            "sort": [
+                {"_score": {"order": "desc"}},
+                {"ingestao_timestamp": {"order": "desc", "unmapped_type": "date"}}
+            ],
+            "_source": [
+                "usuario", "senha", "url", "dominio_email", "dominio_url",
+                "complexidade_senha", "forca_senha", "tamanho_senha",
+                "data_breach", "arquivo", "grupo_telegram", "padrao_detectado"
+            ],
+            "timeout": f"{timeout_sec}s",
+            "track_total_hits": track_total
+        }
+
+        if terminate_after:
+            body["terminate_after"] = terminate_after
+
+        # Executa busca
+        response = await client.search(index=INDEX_NAME, body=body)
+
+        # Processa resultados
+        timed_out = response.get("timed_out", False)
+        total_hits = response["hits"]["total"]
+        total = total_hits["value"] if isinstance(total_hits, dict) else total_hits
+
+        results = []
+        for hit in response["hits"]["hits"]:
+            source = hit["_source"]
+            results.append(CredentialResult(
+                usuario=source.get("usuario", ""),
+                senha=source.get("senha", ""),
+                url=source.get("url"),
+                dominio_email=source.get("dominio_email"),
+                dominio_url=source.get("dominio_url"),
+                complexidade_senha=source.get("complexidade_senha"),
+                forca_senha=source.get("forca_senha"),
+                tamanho_senha=source.get("tamanho_senha"),
+                data_breach=source.get("data_breach"),
+                arquivo=source.get("arquivo"),
+                grupo_telegram=source.get("grupo_telegram"),
+                padrao_detectado=source.get("padrao_detectado")
+            ))
+
+        search_time = int((time.time() - start_time) * 1000)
+        total_pages = (total + request.page_size - 1) // request.page_size if total > 0 else 1
+
+        logger.info(f"🔍 Search-v2 '{request.query}' [{detected_type}]: {total} resultados em {search_time}ms")
+
+        return SearchV2Response(
+            total=total,
+            page=request.page,
+            page_size=request.page_size,
+            total_pages=total_pages,
+            results=results,
+            query=request.query,
+            mode=request.mode.value,
+            detected_type=detected_type,
+            search_time_ms=search_time,
+            timed_out=timed_out
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Erro no search-v2: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/by-domain/{domain}")
+async def search_by_domain_fast(
+    domain: str = Path(..., min_length=3, description="Domínio para buscar"),
+    domain_type: str = Query(default="email", description="Tipo: email ou url"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=10, le=200)
+):
+    """
+    Busca otimizada por domínio específico (term query - muito rápida).
+
+    Exemplos:
+    - /by-domain/riachuelo.com.br?domain_type=email
+    - /by-domain/facebook.com?domain_type=url
+
+    Performance: ~100ms para qualquer quantidade de resultados
+    """
+    start_time = time.time()
+
+    try:
+        client = ElasticsearchClient.get_client()
+
+        domain_lower = domain.lower().lstrip('@')
+        field = "dominio_email" if domain_type == "email" else "dominio_url"
+        offset = (page - 1) * page_size
+
+        # Term query - muito rápida
+        query = {"term": {field: domain_lower}}
+
+        response = await client.search(
+            index=INDEX_NAME,
+            body={
+                "query": query,
+                "from": offset,
+                "size": page_size,
+                "sort": [
+                    {"ingestao_timestamp": {"order": "desc", "unmapped_type": "date"}}
+                ],
+                "_source": [
+                    "usuario", "senha", "url", "dominio_email", "dominio_url",
+                    "complexidade_senha", "forca_senha", "data_breach", "arquivo"
+                ],
+                "track_total_hits": True
+            }
+        )
+
+        total = response["hits"]["total"]["value"]
+        results = []
+
+        for hit in response["hits"]["hits"]:
+            source = hit["_source"]
+            results.append({
+                "usuario": source.get("usuario", ""),
+                "senha": source.get("senha", ""),
+                "url": source.get("url"),
+                "dominio_email": source.get("dominio_email"),
+                "dominio_url": source.get("dominio_url"),
+                "complexidade_senha": source.get("complexidade_senha"),
+                "forca_senha": source.get("forca_senha"),
+                "data_breach": source.get("data_breach"),
+                "arquivo": source.get("arquivo")
+            })
+
+        search_time = int((time.time() - start_time) * 1000)
+
+        logger.info(f"⚡ By-domain '{domain}' [{domain_type}]: {total} em {search_time}ms")
+
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total + page_size - 1) // page_size if total > 0 else 1,
+            "results": results,
+            "domain": domain,
+            "domain_type": domain_type,
+            "search_time_ms": search_time
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Erro no by-domain: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# ENDPOINTS LEGACY (mantidos para compatibilidade)
 # ============================================================
 
 @router.get("/search", response_model=SearchResponse)
