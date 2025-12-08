@@ -78,8 +78,8 @@ export const ProfilePage: React.FC = () => {
       return;
     }
 
-    if (formData.new_password.length < 6) {
-      setMessage({ type: 'error', text: 'A nova senha deve ter pelo menos 6 caracteres' });
+    if (formData.new_password.length < 8) {
+      setMessage({ type: 'error', text: 'A nova senha deve ter pelo menos 8 caracteres' });
       return;
     }
 
@@ -91,37 +91,22 @@ export const ProfilePage: React.FC = () => {
     try {
       setIsLoading(true);
 
-      // Primeiro verificar senha atual fazendo login
-      const loginResponse = await fetch(`${API_BASE}/auth/login`, {
+      // Usar endpoint correto: POST /auth/change-password
+      const response = await fetch(`${API_BASE}/auth/change-password`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: user?.username,
-          password: formData.current_password,
-        }),
-      });
-
-      if (!loginResponse.ok) {
-        throw new Error('Senha atual incorreta');
-      }
-
-      // Se login OK, atualizar senha
-      const updateResponse = await fetch(`${API_BASE}/users/${user?.id}`, {
-        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          password: formData.new_password,
+          current_password: formData.current_password,
+          new_password: formData.new_password,
         }),
       });
 
-      if (!updateResponse.ok) {
-        const error = await updateResponse.json();
-        throw new Error(error.detail || 'Erro ao atualizar senha');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Erro ao alterar senha');
       }
 
       // Limpar campos de senha
