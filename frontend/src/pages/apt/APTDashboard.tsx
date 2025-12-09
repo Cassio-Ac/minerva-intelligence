@@ -355,10 +355,15 @@ const APTDashboard: React.FC = () => {
       </div>
 
       {/* Actor Details Modal for Map View */}
-      {viewMode === 'map' && selectedActor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      {viewMode === 'map' && selectedActor && rightPanelView !== 'matrix' && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleClosePanel();
+          }}
+        >
           <div
-            className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-lg shadow-2xl"
+            className="w-full max-w-4xl h-[85vh] flex flex-col rounded-lg shadow-2xl"
             style={{ backgroundColor: currentColors.bg.primary }}
           >
             <ActorDetailsPanel
@@ -367,6 +372,60 @@ const APTDashboard: React.FC = () => {
               onTechniquesLoaded={handleTechniquesLoaded}
               onViewMatrix={handleViewMatrix}
             />
+          </div>
+        </div>
+      )}
+
+      {/* MITRE ATT&CK Matrix Modal for Map View */}
+      {viewMode === 'map' && rightPanelView === 'matrix' && highlightedTechniques.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleClosePanel();
+          }}
+        >
+          <div
+            className="w-[95vw] h-[90vh] flex flex-col rounded-lg shadow-2xl overflow-hidden"
+            style={{ backgroundColor: currentColors.bg.primary }}
+          >
+            {/* Matrix Header */}
+            <div
+              className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0"
+              style={{ borderColor: currentColors.border.default }}
+            >
+              <div className="flex items-center gap-3">
+                <Shield size={24} style={{ color: currentColors.accent.primary }} />
+                <div>
+                  <h2 className="text-xl font-semibold" style={{ color: currentColors.text.primary }}>
+                    MITRE ATT&CK Matrix
+                  </h2>
+                  <p className="text-sm" style={{ color: currentColors.text.secondary }}>
+                    {selectedActor} - {highlightedTechniques.length} techniques highlighted
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setRightPanelView('details')}
+                  className="px-4 py-2 rounded text-sm hover:opacity-80 transition-opacity"
+                  style={{ backgroundColor: currentColors.bg.secondary, color: currentColors.text.primary }}
+                >
+                  ← Back to Actor
+                </button>
+                <button
+                  onClick={handleClosePanel}
+                  className="p-2 rounded hover:bg-opacity-80 transition-colors"
+                  style={{ backgroundColor: currentColors.bg.secondary }}
+                >
+                  <X size={20} style={{ color: currentColors.text.primary }} />
+                </button>
+              </div>
+            </div>
+
+            {/* Matrix Content */}
+            <div className="flex-1 overflow-auto p-4">
+              <AttackMatrix highlightedTechniques={highlightedTechniques} />
+            </div>
           </div>
         </div>
       )}

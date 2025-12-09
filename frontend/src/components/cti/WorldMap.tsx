@@ -422,10 +422,10 @@ const WorldMap: React.FC<WorldMapProps> = ({ onActorClick, highlightedActor, cla
   }
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative h-full flex flex-col ${className}`}>
       {/* Map Container */}
       <div
-        className="rounded-lg overflow-hidden"
+        className="rounded-lg overflow-hidden flex-1 flex flex-col"
         style={{ backgroundColor: currentColors.bg.secondary }}
       >
         {/* Header */}
@@ -446,7 +446,7 @@ const WorldMap: React.FC<WorldMapProps> = ({ onActorClick, highlightedActor, cla
         </div>
 
         {/* Map */}
-        <div className="relative" style={{ height: '500px' }}>
+        <div className="relative flex-1" style={{ minHeight: '400px' }}>
           <ComposableMap
             projection="geoMercator"
             projectionConfig={{
