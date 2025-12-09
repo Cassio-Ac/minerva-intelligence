@@ -144,6 +144,73 @@ async def get_cluster_by_name(
     return cluster.to_dict()
 
 
+@router.get("/actors-by-country", summary="Get threat actors grouped by country")
+async def get_actors_by_country(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Get threat actors grouped by country with counts
+
+    Returns list of countries with actor counts for world map visualization.
+    Each entry includes:
+    - country: ISO 2-letter country code
+    - count: Number of threat actors from that country
+    - actors: List of actor names
+
+    **Example response:**
+    ```json
+    {
+        "countries": [
+            {"country": "CN", "count": 45, "actors": ["APT1", "APT10", ...]},
+            {"country": "RU", "count": 38, "actors": ["APT28", "APT29", ...]},
+            ...
+        ],
+        "total_actors": 864,
+        "countries_with_actors": 25
+    }
+    ```
+    """
+    from sqlalchemy import select, func
+    from app.cti.models.galaxy_cluster import GalaxyCluster
+
+    # Get actors grouped by country
+    stmt = select(
+        GalaxyCluster.country,
+        func.count(GalaxyCluster.id).label('count'),
+        func.array_agg(GalaxyCluster.value).label('actors')
+    ).where(
+        GalaxyCluster.galaxy_type == "threat-actor"
+    ).where(
+        GalaxyCluster.country.isnot(None)
+    ).where(
+        GalaxyCluster.country != ""
+    ).group_by(
+        GalaxyCluster.country
+    ).order_by(
+        func.count(GalaxyCluster.id).desc()
+    )
+
+    result = await db.execute(stmt)
+    rows = result.all()
+
+    countries = []
+    total_actors = 0
+    for row in rows:
+        countries.append({
+            "country": row.country,
+            "count": row.count,
+            "actors": sorted(row.actors) if row.actors else []
+        })
+        total_actors += row.count
+
+    return {
+        "countries": countries,
+        "total_actors": total_actors,
+        "countries_with_actors": len(countries)
+    }
+
+
 @router.get("/available", summary="List available cluster types")
 async def list_available_clusters(
     current_user: dict = Depends(get_current_user),

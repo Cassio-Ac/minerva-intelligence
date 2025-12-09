@@ -10,12 +10,13 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Target, AlertCircle, Loader2, Shield, Brain, Database, Search, List } from 'lucide-react';
+import { Target, AlertCircle, Loader2, Shield, Brain, Database, Search, List, Globe, LayoutGrid } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSettingsStore } from '@stores/settingsStore';
 import ActorsList from '../../components/cti/ActorsList';
 import AttackMatrix from '../../components/cti/AttackMatrix';
 import ActorDetailsPanel from '../../components/cti/ActorDetailsPanel';
+import WorldMap from '../../components/cti/WorldMap';
 import { ctiService } from '../../services/cti/ctiService';
 
 const CTIDashboard: React.FC = () => {
@@ -26,6 +27,12 @@ const CTIDashboard: React.FC = () => {
   const [rightPanelView, setRightPanelView] = useState<'none' | 'details' | 'matrix'>('none');
   const [selectedActor, setSelectedActor] = useState<string | null>(null);
   const [highlightedTechniques, setHighlightedTechniques] = useState<string[]>([]);
+
+  // View mode: 'list' | 'map'
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('map');
+
+  // Search query for highlighting on map
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Loading states
   const [isHighlighting, setIsHighlighting] = useState(false);
@@ -242,66 +249,162 @@ const CTIDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Two-Column Layout: Actors List + Dynamic Right Panel */}
-      <div
-        className={rightPanelView !== 'none' ? "grid grid-cols-[400px_1fr] gap-4" : "flex"}
-        style={{ height: 'calc(100vh - 320px)' }}
-      >
-        {/* Column 1: Threat Actors (Always Visible) */}
+      {/* View Mode Toggle and Search */}
+      <div className="mb-4 flex items-center gap-4">
+        {/* View Mode Toggle */}
         <div
-          className="rounded-lg p-4 flex flex-col overflow-hidden"
-          style={{
-            backgroundColor: currentColors.bg.primary,
-            width: rightPanelView !== 'none' ? 'auto' : '400px',
-            height: '100%'
-          }}
+          className="flex rounded-lg overflow-hidden"
+          style={{ border: `1px solid ${currentColors.border.default}` }}
         >
-          <h2 className="text-lg font-semibold mb-4" style={{ color: currentColors.text.primary }}>
-            Threat Actors
-          </h2>
-          <div className="flex-1 overflow-hidden">
-            <ActorsList
-              selectedActors={[]}
-              onActorSelect={() => {}}
-              onActorClick={handleActorClick}
-            />
-          </div>
+          <button
+            onClick={() => setViewMode('map')}
+            className="px-4 py-2 flex items-center gap-2 text-sm font-medium transition-colors"
+            style={{
+              backgroundColor: viewMode === 'map' ? currentColors.accent.primary : currentColors.bg.primary,
+              color: viewMode === 'map' ? currentColors.text.inverse : currentColors.text.primary
+            }}
+          >
+            <Globe size={16} />
+            Map View
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className="px-4 py-2 flex items-center gap-2 text-sm font-medium transition-colors"
+            style={{
+              backgroundColor: viewMode === 'list' ? currentColors.accent.primary : currentColors.bg.primary,
+              color: viewMode === 'list' ? currentColors.text.inverse : currentColors.text.primary
+            }}
+          >
+            <LayoutGrid size={16} />
+            List View
+          </button>
         </div>
 
-        {/* Column 2: Actor Details Panel */}
-        {rightPanelView === 'details' && selectedActor && (
-          <ActorDetailsPanel
-            actorName={selectedActor}
-            onClose={handleClosePanel}
-            onTechniquesLoaded={handleTechniquesLoaded}
-            onViewMatrix={handleViewMatrix}
-          />
-        )}
-
-        {/* Column 2: MITRE ATT&CK Matrix */}
-        {rightPanelView === 'matrix' && highlightedTechniques.length > 0 && (
-          <div
-            className="rounded-lg p-4 flex flex-col"
-            style={{ backgroundColor: currentColors.bg.primary, minWidth: 0 }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
-                MITRE ATT&CK Matrix - {highlightedTechniques.length} Techniques
-              </h2>
-              <button
-                onClick={() => setRightPanelView('details')}
-                className="px-3 py-1 rounded text-sm hover:opacity-80"
-                style={{ backgroundColor: currentColors.bg.secondary, color: currentColors.text.primary }}
-              >
-                Back to Details
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto">
-              <AttackMatrix highlightedTechniques={highlightedTechniques} />
+        {/* Search for highlighting on map */}
+        {viewMode === 'map' && (
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 transform -translate-y-1/2"
+                style={{ color: currentColors.text.secondary }}
+              />
+              <input
+                type="text"
+                placeholder="Search actor to highlight on map..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2"
+                style={{
+                  backgroundColor: currentColors.bg.primary,
+                  color: currentColors.text.primary,
+                  border: `1px solid ${currentColors.border.default}`,
+                }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded hover:bg-opacity-80"
+                  style={{ color: currentColors.text.muted }}
+                >
+                  ×
+                </button>
+              )}
             </div>
           </div>
         )}
       </div>
+
+      {/* Map View */}
+      {viewMode === 'map' && (
+        <div style={{ height: 'calc(100vh - 380px)' }}>
+          <WorldMap
+            onActorClick={handleActorClick}
+            highlightedActor={searchQuery || null}
+            className="h-full"
+          />
+        </div>
+      )}
+
+      {/* List View: Two-Column Layout: Actors List + Dynamic Right Panel */}
+      {viewMode === 'list' && (
+        <div
+          className={rightPanelView !== 'none' ? "grid grid-cols-[400px_1fr] gap-4" : "flex"}
+          style={{ height: 'calc(100vh - 380px)' }}
+        >
+          {/* Column 1: Threat Actors (Always Visible) */}
+          <div
+            className="rounded-lg p-4 flex flex-col overflow-hidden"
+            style={{
+              backgroundColor: currentColors.bg.primary,
+              width: rightPanelView !== 'none' ? 'auto' : '400px',
+              height: '100%'
+            }}
+          >
+            <h2 className="text-lg font-semibold mb-4" style={{ color: currentColors.text.primary }}>
+              Threat Actors
+            </h2>
+            <div className="flex-1 overflow-hidden">
+              <ActorsList
+                selectedActors={[]}
+                onActorSelect={() => {}}
+                onActorClick={handleActorClick}
+              />
+            </div>
+          </div>
+
+          {/* Column 2: Actor Details Panel */}
+          {rightPanelView === 'details' && selectedActor && (
+            <ActorDetailsPanel
+              actorName={selectedActor}
+              onClose={handleClosePanel}
+              onTechniquesLoaded={handleTechniquesLoaded}
+              onViewMatrix={handleViewMatrix}
+            />
+          )}
+
+          {/* Column 2: MITRE ATT&CK Matrix */}
+          {rightPanelView === 'matrix' && highlightedTechniques.length > 0 && (
+            <div
+              className="rounded-lg p-4 flex flex-col"
+              style={{ backgroundColor: currentColors.bg.primary, minWidth: 0 }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+                  MITRE ATT&CK Matrix - {highlightedTechniques.length} Techniques
+                </h2>
+                <button
+                  onClick={() => setRightPanelView('details')}
+                  className="px-3 py-1 rounded text-sm hover:opacity-80"
+                  style={{ backgroundColor: currentColors.bg.secondary, color: currentColors.text.primary }}
+                >
+                  Back to Details
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto">
+                <AttackMatrix highlightedTechniques={highlightedTechniques} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Actor Details Modal for Map View */}
+      {viewMode === 'map' && selectedActor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div
+            className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-lg shadow-2xl"
+            style={{ backgroundColor: currentColors.bg.primary }}
+          >
+            <ActorDetailsPanel
+              actorName={selectedActor}
+              onClose={handleClosePanel}
+              onTechniquesLoaded={handleTechniquesLoaded}
+              onViewMatrix={handleViewMatrix}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

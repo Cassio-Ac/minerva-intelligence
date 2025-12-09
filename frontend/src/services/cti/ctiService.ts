@@ -146,6 +146,18 @@ export interface ActorGeopoliticalData {
   description?: string;
 }
 
+export interface CountryActors {
+  country: string;
+  count: number;
+  actors: string[];
+}
+
+export interface ActorsByCountryResponse {
+  countries: CountryActors[];
+  total_actors: number;
+  countries_with_actors: number;
+}
+
 // ==================== ACTORS API ====================
 
 export const ctiActorsApi = {
@@ -194,6 +206,18 @@ export const ctiActorsApi = {
       }
     });
     return response.data.countries;
+  },
+
+  /**
+   * Get threat actors grouped by country (from MISP Galaxy)
+   */
+  async getActorsByCountry(): Promise<ActorsByCountryResponse> {
+    const response = await axios.get(`${CTI_BASE}/galaxy/actors-by-country`, {
+      headers: {
+        Authorization: `Bearer ${getAuthToken()}`
+      }
+    });
+    return response.data;
   }
 };
 
