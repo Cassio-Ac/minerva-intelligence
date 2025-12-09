@@ -35,14 +35,21 @@ def sync_otx_pulses():
 
 async def _run_pulse_sync():
     """Helper para executar sync de pulses de forma assíncrona"""
-    from app.db.database import async_session_maker
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+    from app.core.config import settings
     from app.cti.services.otx_pulse_sync_service import OTXPulseSyncService
 
-    async with async_session_maker() as session:
+    # Criar nova engine para evitar problemas de event loop
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
         service = OTXPulseSyncService(session)
         stats = await service.sync_subscribed_pulses(limit=100)
         logger.info(f"📊 Sync stats: {stats}")
-        return stats
+
+    await engine.dispose()
+    return stats
 
 
 @celery_app.task(name="app.tasks.otx_tasks.bulk_enrich_iocs")
@@ -67,14 +74,20 @@ def bulk_enrich_iocs():
 
 async def _run_bulk_enrichment():
     """Helper para executar bulk enrichment de forma assíncrona"""
-    from app.db.database import async_session_maker
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+    from app.core.config import settings
     from app.cti.services.otx_bulk_enrichment_service import OTXBulkEnrichmentService
 
-    async with async_session_maker() as session:
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
         service = OTXBulkEnrichmentService(session)
         stats = await service.enrich_high_priority_batch(batch_size=200)
         logger.info(f"📊 Enrichment stats: {stats}")
-        return stats
+
+    await engine.dispose()
+    return stats
 
 
 @celery_app.task(name="app.tasks.otx_tasks.export_pulses_to_misp")
@@ -99,14 +112,20 @@ def export_pulses_to_misp():
 
 async def _run_misp_export():
     """Helper para executar MISP export de forma assíncrona"""
-    from app.db.database import async_session_maker
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+    from app.core.config import settings
     from app.cti.services.otx_misp_exporter import OTXMISPExporter
 
-    async with async_session_maker() as session:
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
         exporter = OTXMISPExporter(session)
         stats = await exporter.export_pending_pulses(limit=20)
         logger.info(f"📊 Export stats: {stats}")
-        return stats
+
+    await engine.dispose()
+    return stats
 
 
 @celery_app.task(name="app.tasks.otx_tasks.reset_otx_daily_usage")
@@ -130,13 +149,19 @@ def reset_otx_daily_usage():
 
 async def _run_reset_usage():
     """Helper para resetar contadores de forma assíncrona"""
-    from app.db.database import async_session_maker
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+    from app.core.config import settings
     from app.cti.services.otx_key_manager import OTXKeyManager
 
-    async with async_session_maker() as session:
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
         key_manager = OTXKeyManager(session)
         await key_manager.reset_daily_usage()
         logger.info("✅ All OTX key usage counters reset to 0")
+
+    await engine.dispose()
 
 
 # Manual task para teste rápido
@@ -161,23 +186,37 @@ def test_otx_connection():
 
 async def _test_connection():
     """Helper para testar conexão OTX"""
-    from app.db.database import async_session_maker
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+    from app.core.config import settings
     from app.cti.services.otx_key_manager import OTXKeyManager
-    from OTXv2 import OTXv2
+    import requests
 
-    async with async_session_maker() as session:
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
         key_manager = OTXKeyManager(session)
         key = await key_manager.get_available_key()
 
         if not key:
+            await engine.dispose()
             raise Exception("No OTX API keys available")
 
-        # Tentar fazer uma requisição simples
-        otx = OTXv2(key.api_key)
-        pulses = otx.getall(limit=1)
+        # Testar via REST API (mais rapido que SDK)
+        headers = {"X-OTX-API-KEY": key.api_key}
+        response = requests.get(
+            "https://otx.alienvault.com/api/v1/pulses/subscribed",
+            headers=headers,
+            params={"limit": 1, "page": 1},
+            timeout=30
+        )
+        response.raise_for_status()
+        data = response.json()
 
-        if pulses and 'results' in pulses:
-            logger.info(f"✅ OTX API is responding. Found pulses.")
-            return True
-        else:
-            raise Exception("OTX API returned no data")
+    await engine.dispose()
+
+    if data and 'results' in data:
+        logger.info(f"✅ OTX API is responding. Found {len(data.get('results', []))} pulses.")
+        return True
+    else:
+        raise Exception("OTX API returned no data")

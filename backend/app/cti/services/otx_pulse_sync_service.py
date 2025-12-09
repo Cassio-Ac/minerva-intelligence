@@ -3,8 +3,10 @@ OTX Pulse Sync Service
 
 Service para sincronizar OTX Pulses automaticamente para o banco de dados
 Suporta sync de pulses subscritos e pulses por tags/adversaries
+
+Usa API REST direta ao inves de OTXv2 SDK (que e muito lento por fazer paginacao excessiva)
 """
-from OTXv2 import OTXv2
+import requests
 import logging
 from typing import Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,9 +15,11 @@ from datetime import datetime
 from app.cti.models.otx_pulse import OTXPulse, OTXPulseIndicator, OTXSyncHistory
 from app.cti.models.otx_api_key import OTXAPIKey
 from app.cti.services.otx_key_manager import OTXKeyManager
-import asyncio
 
 logger = logging.getLogger(__name__)
+
+# OTX API Base URL
+OTX_API_BASE = "https://otx.alienvault.com/api/v1"
 
 
 class OTXPulseSyncService:
@@ -63,12 +67,18 @@ class OTXPulseSyncService:
             sync_history.api_key_id = key.id
             await self.session.commit()
 
-            # Criar cliente OTX
-            otx = OTXv2(key.api_key)
+            # Buscar pulses via API REST direta (mais rapido que SDK)
+            logger.info("📥 Fetching subscribed pulses from OTX API...")
+            headers = {"X-OTX-API-KEY": key.api_key}
 
-            # Buscar pulses subscritos
-            logger.info("📥 Fetching subscribed pulses from OTX...")
-            pulses_data = otx.getall(limit=limit)
+            response = requests.get(
+                f"{OTX_API_BASE}/pulses/subscribed",
+                headers=headers,
+                params={"limit": limit, "page": 1},
+                timeout=60
+            )
+            response.raise_for_status()
+            pulses_data = response.json()
 
             if not pulses_data or 'results' not in pulses_data:
                 logger.warning("⚠️ No pulses returned from OTX")
@@ -157,12 +167,18 @@ class OTXPulseSyncService:
             sync_history.api_key_id = key.id
             await self.session.commit()
 
-            # Criar cliente
-            otx = OTXv2(key.api_key)
-
-            # Buscar pulses
+            # Buscar pulses via API REST
             logger.info(f"📥 Searching OTX for: {query}")
-            search_results = otx.search_pulses(query, max_results=limit)
+            headers = {"X-OTX-API-KEY": key.api_key}
+
+            response = requests.get(
+                f"{OTX_API_BASE}/search/pulses",
+                headers=headers,
+                params={"q": query, "limit": limit, "page": 1},
+                timeout=60
+            )
+            response.raise_for_status()
+            search_results = response.json()
 
             if not search_results or 'results' not in search_results:
                 logger.warning(f"⚠️ No results for query: {query}")
@@ -178,9 +194,15 @@ class OTXPulseSyncService:
             # Processar pulses
             for pulse_data in pulses:
                 try:
-                    # Buscar detalhes completos do pulse
+                    # Buscar detalhes completos do pulse via REST
                     pulse_id = pulse_data.get('id')
-                    full_pulse = otx.get_pulse_details(pulse_id)
+                    pulse_resp = requests.get(
+                        f"{OTX_API_BASE}/pulses/{pulse_id}",
+                        headers=headers,
+                        timeout=30
+                    )
+                    pulse_resp.raise_for_status()
+                    full_pulse = pulse_resp.json()
 
                     result = await self._process_pulse(full_pulse, key.id)
                     if result['is_new']:
