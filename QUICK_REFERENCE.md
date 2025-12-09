@@ -1,199 +1,136 @@
-# 🚀 Quick Reference - Intelligence Platform
+# Quick Reference - Minerva Intelligence Platform
 
-## 📍 URLs Importantes
-
-```
-✅ USAR SEMPRE:
-Frontend:  http://localhost:5180
-Backend:   http://localhost:8001
-API Docs:  http://localhost:8001/docs
-
-❌ NUNCA USAR (Dashboard AI):
-Frontend:  http://localhost:5173
-Backend:   http://localhost:8000
-```
-
-## 🔐 Credenciais
+## URLs de Producao
 
 ```
-Username: admin
-Password: admin
+Frontend:  https://kaermohen.tailf4266d.ts.net
+Backend:   https://kaermohen.tailf4266d.ts.net (proxy via nginx)
+API:       https://kaermohen.tailf4266d.ts.net/api/v1/
+API Docs:  https://kaermohen.tailf4266d.ts.net/docs
+
+Local (debug):
+Backend:   http://localhost:8002
 ```
 
-## 🔌 Portas do Sistema
+## Portas do Sistema
 
-| Serviço | Intelligence Platform | Dashboard AI (Evitar) |
-|---------|----------------------|----------------------|
-| Frontend | **5180** ✅ | 5173 ❌ |
-| Backend | **8001** ✅ | 8000 ❌ |
-| PostgreSQL | **5433** ✅ | 5432 ❌ |
-| Redis | **6380** ✅ | 6379 ❌ |
-| Elasticsearch | **9200** (compartilhado) | 9200 (compartilhado) |
+| Servico | Porta | Status |
+|---------|-------|--------|
+| Backend (FastAPI) | 8002 | Ativo |
+| PostgreSQL | 5432 | Ativo |
+| Elasticsearch | 9200 (SSL) | Ativo |
+| Redis | 6379 | Ativo |
 
-## ⚡ Comandos Rápidos
-
-### Iniciar Sistema
+## Servicos Systemd
 
 ```bash
-cd /Users/angellocassio/Documents/intelligence-platform
-./start-dev.sh
-```
-
-### Parar Sistema
-
-```bash
-./stop-dev.sh
-```
-
-### Verificar Status
-
-```bash
-# Verificar portas
-lsof -i :5180 -i :8001 -i :5433
-
-# Testar backend
-curl http://localhost:8001/
-
-# Testar login
-cd backend
-PYTHONPATH=$PWD venv/bin/python3 test_backend_quick.py
-```
-
-### Logs
-
-```bash
-# Backend logs (tempo real)
-cd backend
-PYTHONPATH=$PWD venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
-
-# Elasticsearch
-curl 'http://localhost:9200/_cat/indices?v'
-```
-
-## 🐛 Problemas Comuns
-
-### WebSocket Error (IGNORAR)
-
-```
-❌ WebSocket connection error: websocket error
-```
-
-**Status:** ⚠️ Não afeta funcionalidade
-**Ação:** Ignorar - sistema funciona normalmente
-
-### Elasticsearch Não Aparece no Chat
-
-**Causa:** Configurado para Docker ao invés de localhost
-**Solução:** Settings → ES Servers → Trocar para `http://localhost:9200`
-
-### MISP Feeds Vazios
-
-**Verificar:**
-1. Backend correto: `http://localhost:8001`
-2. Login feito com `admin/admin`
-3. Não está acessando Dashboard AI (porta 5173)
-
-### Login Não Funciona
-
-```bash
-# Verificar se backend está rodando
-curl http://localhost:8001/
-
-# Deve retornar:
-# {"app":"Minerva - Intelligence Platform","version":"1.0.0"}
-```
-
-## ✅ Checklist de Validação
-
-Após iniciar o sistema, verificar:
-
-- [ ] Frontend rodando em http://localhost:5180
-- [ ] Backend rodando em http://localhost:8001
-- [ ] Login com `admin/admin` funciona
-- [ ] Dashboard carrega lista de dashboards
-- [ ] Chat mostra índices do Elasticsearch
-- [ ] CTI → MISP Feeds mostra 14 feeds
-- [ ] WebSocket com erro (OK, ignorar)
-
-## 📂 Estrutura de Arquivos
-
-```
-intelligence-platform/
-├── backend/
-│   ├── app/
-│   │   ├── main.py              # Entry point
-│   │   ├── cti/                 # CTI module
-│   │   │   ├── api/             # API endpoints
-│   │   │   ├── services/        # Business logic
-│   │   │   └── models/          # Database models
-│   │   └── websocket/           # WebSocket config
-│   ├── .env                     # Environment vars
-│   ├── requirements.txt         # Python deps
-│   └── test_*.py                # Test scripts
-├── frontend/
-│   ├── src/
-│   │   ├── pages/               # Pages
-│   │   ├── services/            # API clients
-│   │   └── stores/              # State management
-│   └── .env                     # Frontend config
-├── TROUBLESHOOTING.md           # Detailed guide
-├── QUICK_REFERENCE.md           # This file
-└── README.md                    # Project docs
-```
-
-## 🔧 Configurações Importantes
-
-### Backend (.env)
-
-```env
-PORT=8002                        # Mas usa 8001 no uvicorn
-DATABASE_URL=postgresql+asyncpg://intelligence_user:intelligence_pass_secure_2024@localhost:5433/intelligence_platform
-ES_URL=http://localhost:9200
-REDIS_URL=redis://localhost:6380/0
-```
-
-### Frontend (.env)
-
-```env
-VITE_API_URL=http://localhost:8001
-```
-
-## 🆘 Emergência
-
-### Sistema não responde
-
-```bash
-# Parar tudo
-pkill -f uvicorn
-pkill -f "vite.*5180"
+# Ver status
+sudo systemctl status minerva-backend
+sudo systemctl status minerva-celery
+sudo systemctl status minerva-celery-beat
 
 # Reiniciar
-cd /Users/angellocassio/Documents/intelligence-platform
-./start-dev.sh
+sudo systemctl restart minerva-backend
+sudo systemctl restart minerva-celery
+sudo systemctl restart minerva-celery-beat
+
+# Logs
+sudo journalctl -u minerva-backend -f
+sudo journalctl -u minerva-celery -f
 ```
 
-### Dashboard AI interferindo
+## Comandos Uteis
+
+### MISP Sync Manual
 
 ```bash
-# Parar Docker do Dashboard AI
-cd ~/Downloads/dashboard-ai-v2
-docker-compose down
+cd /var/www/minerva/backend
+source venv/bin/activate
 
-# Verificar
-docker ps  # Não deve mostrar containers
-lsof -i :8000  # Não deve retornar nada
+# Quick sync (mais rapido, 500-1000 IOCs/feed)
+celery -A app.celery_app call app.tasks.misp_tasks.quick_sync_all_feeds
+
+# Full sync (5000 IOCs/feed)
+celery -A app.celery_app call app.tasks.misp_tasks.sync_all_misp_feeds
 ```
 
-### Banco de dados errado
+### Database Queries
 
 ```bash
-# Verificar connection string
-grep DATABASE_URL backend/.env
+# Conectar ao PostgreSQL
+sudo -u postgres psql -d minerva_db
 
-# Deve ter: localhost:5433/intelligence_platform
-# NÃO pode ter: localhost:5432/dashboard_ai
+# Contar IOCs
+SELECT COUNT(*) FROM misp_iocs;
+
+# IOCs por feed
+SELECT f.name, COUNT(i.id) as count
+FROM misp_feeds f
+LEFT JOIN misp_iocs i ON f.id = i.feed_id
+GROUP BY f.name ORDER BY count DESC;
+```
+
+### Redis
+
+```bash
+redis-cli ping   # Deve retornar PONG
+redis-cli info   # Estatisticas
+```
+
+## Schedule Automatico (Celery Beat)
+
+| Task | Frequencia | Horarios |
+|------|------------|----------|
+| MISP Feeds | A cada 2h | 00:00, 02:00, 04:00... |
+| RSS Feeds | A cada 2h | 00:00, 02:00, 04:00... |
+| OTX Pulses | 2x/dia | 09:00, 21:00 |
+| Malpedia | 1x/dia | 02:00 |
+| CaveiraTech | 2x/dia | 10:00, 22:00 |
+
+## Estatisticas Atuais
+
+- **IOCs MISP**: ~50,000
+- **Feeds Ativos**: 12 de 16
+- **Sync**: A cada 2 horas
+
+## Arquivos Importantes
+
+```
+/var/www/minerva/backend/          # Backend producao
+/var/www/minerva/frontend/         # Frontend build
+/var/www/minerva/backend/.env      # Config (NAO commitar)
+/etc/systemd/system/minerva-*.service  # Systemd units
+/etc/nginx/sites-enabled/minerva   # Nginx config
+```
+
+## Troubleshooting
+
+### Backend nao inicia
+
+```bash
+sudo journalctl -u minerva-backend -n 50 --no-pager
+```
+
+### Celery nao processa tasks
+
+```bash
+# Verificar Redis
+redis-cli ping
+
+# Ver logs
+sudo journalctl -u minerva-celery -n 50 --no-pager
+```
+
+### IOCs nao importando
+
+```bash
+# Ver erro especifico
+sudo journalctl -u minerva-celery | grep "Error"
+
+# Rodar sync manual
+celery -A app.celery_app call app.tasks.misp_tasks.quick_sync_all_feeds
 ```
 
 ---
 
-**Para mais detalhes, ver:** [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
+**Documentacao completa**: Ver `backend/MISP_SYNC_SCHEDULE.md`
