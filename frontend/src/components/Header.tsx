@@ -109,6 +109,7 @@ export const Header: React.FC = () => {
     { path: '/telegram', label: 'Telegram', iconImage: '/assets/icons/telegram.png' },
     { path: '/credentials', label: 'Credenciais', iconImage: '/assets/icons/creds.png' },
     { path: '/datalake', label: 'Data Lake', iconImage: '/assets/icons/data_lake.png' },
+    { path: '/apt', label: 'APT', icon: '🎯' },
     { path: '/cti', label: 'CTI', iconImage: '/assets/icons/CTI.png' },
     { path: '/downloads', label: 'Downloads', iconImage: '/assets/icons/download.png' },
     { path: '/settings', label: 'Configurações', iconImage: '/assets/icons/config.png', requiresAdmin: true },

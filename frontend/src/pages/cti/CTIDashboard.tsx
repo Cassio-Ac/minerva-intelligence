@@ -1,78 +1,84 @@
 /**
  * CTI Dashboard - Cyber Threat Intelligence
  *
- * Two-column layout:
- * 1. Threat Actors (left) - fixed width
- * 2. Actor Details Panel OR MITRE ATT&CK Matrix (right) - dynamic content
- *
- * Click on actor to see detailed information in the right panel.
- * Click "View in Matrix" to show MITRE ATT&CK matrix instead of details.
+ * Focused on IOC verification and MISP intelligence:
+ * - IOC Search (MISP + OTX)
+ * - IOC Enrichment with LLM
+ * - MISP Feeds testing
+ * - IOC Browser
  */
 
 import React, { useState, useEffect } from 'react';
-import { Target, AlertCircle, Loader2, Shield, Brain, Database, Search, List, Globe, LayoutGrid } from 'lucide-react';
+import { Target, Shield, Brain, Search, List, Database, RefreshCw, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSettingsStore } from '@stores/settingsStore';
-import ActorsList from '../../components/cti/ActorsList';
-import AttackMatrix from '../../components/cti/AttackMatrix';
-import ActorDetailsPanel from '../../components/cti/ActorDetailsPanel';
-import WorldMap from '../../components/cti/WorldMap';
-import { ctiService } from '../../services/cti/ctiService';
+import mispFeedsService, { IOCStats } from '../../services/cti/mispFeedsService';
 
 const CTIDashboard: React.FC = () => {
   const { currentColors } = useSettingsStore();
   const navigate = useNavigate();
 
-  // View state: 'none' | 'details' | 'matrix'
-  const [rightPanelView, setRightPanelView] = useState<'none' | 'details' | 'matrix'>('none');
-  const [selectedActor, setSelectedActor] = useState<string | null>(null);
-  const [highlightedTechniques, setHighlightedTechniques] = useState<string[]>([]);
-
-  // View mode: 'list' | 'map'
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('map');
-
-  // Search query for highlighting on map
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Loading states
-  const [isHighlighting, setIsHighlighting] = useState(false);
-  const [highlightError, setHighlightError] = useState<string | null>(null);
-
   // Stats
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<IOCStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load initial stats
+  // Quick search
+  const [quickSearch, setQuickSearch] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState<any>(null);
+
+  // Load stats on mount
   useEffect(() => {
     loadStats();
   }, []);
 
   const loadStats = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const data = await ctiService.techniques.getStats();
+      const data = await mispFeedsService.getStats();
       setStats(data);
-    } catch (error) {
-      console.error('Error loading CTI stats:', error);
+    } catch (err: any) {
+      console.error('Error loading stats:', err);
+      setError('Failed to load IOC statistics');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleActorClick = (actorName: string) => {
-    setSelectedActor(actorName);
-    setRightPanelView('details');
+  const handleQuickSearch = async () => {
+    if (!quickSearch.trim()) return;
+
+    setSearching(true);
+    setSearchResult(null);
+    try {
+      const result = await mispFeedsService.searchIoC(quickSearch.trim());
+      setSearchResult(result);
+    } catch (err: any) {
+      console.error('Error searching IOC:', err);
+      setSearchResult({ error: 'Search failed' });
+    } finally {
+      setSearching(false);
+    }
   };
 
-  const handleTechniquesLoaded = (techniques: string[]) => {
-    console.log('🎯 Techniques loaded:', techniques.length);
-    setHighlightedTechniques(techniques);
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleQuickSearch();
+    }
   };
 
-  const handleViewMatrix = () => {
-    setRightPanelView('matrix');
-  };
-
-  const handleClosePanel = () => {
-    setRightPanelView('none');
-    setSelectedActor(null);
-    setHighlightedTechniques([]);
+  // IOC type icons
+  const getTypeIcon = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'ip': return '🌐';
+      case 'domain': return '🔗';
+      case 'url': return '🔗';
+      case 'hash': return '#️⃣';
+      case 'email': return '📧';
+      default: return '📄';
+    }
   };
 
   return (
@@ -83,328 +89,348 @@ const CTIDashboard: React.FC = () => {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <Target size={32} style={{ color: currentColors.text.primary }} />
+          <Target size={32} style={{ color: currentColors.accent.primary }} />
           <h1 className="text-3xl font-semibold" style={{ color: currentColors.text.primary }}>
-            Cyber Threat Intelligence
+            CTI - IOC Intelligence
           </h1>
         </div>
         <p className="text-sm" style={{ color: currentColors.text.secondary }}>
-          Monitor threat actors and MITRE ATT&CK techniques. Click on an actor to see details.
+          Search and verify Indicators of Compromise (IOCs) using MISP feeds and threat intelligence sources.
         </p>
+      </div>
 
-        {/* Navigation Cards */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* MISP Feeds Card */}
+      {/* Quick Search Bar */}
+      <div
+        className="mb-6 p-4 rounded-lg"
+        style={{ backgroundColor: currentColors.bg.primary }}
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <Search size={20} style={{ color: currentColors.accent.primary }} />
+          <h2 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+            Quick IOC Search
+          </h2>
+        </div>
+        <div className="flex gap-3">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              placeholder="Enter IP, domain, URL, or hash to verify..."
+              value={quickSearch}
+              onChange={(e) => setQuickSearch(e.target.value)}
+              onKeyPress={handleKeyPress}
+              className="w-full px-4 py-3 rounded-lg text-sm focus:outline-none focus:ring-2"
+              style={{
+                backgroundColor: currentColors.bg.secondary,
+                color: currentColors.text.primary,
+                border: `1px solid ${currentColors.border.default}`,
+              }}
+            />
+          </div>
           <button
-            onClick={() => navigate('/cti/feeds')}
-            className="p-4 rounded-lg border-2 text-left hover:shadow-lg transition-all"
+            onClick={handleQuickSearch}
+            disabled={searching || !quickSearch.trim()}
+            className="px-6 py-3 rounded-lg font-medium flex items-center gap-2 transition-colors"
             style={{
-              backgroundColor: currentColors.bg.primary,
-              borderColor: currentColors.border.default,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = currentColors.accent.primary;
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = currentColors.border.default;
-              e.currentTarget.style.transform = 'translateY(0)';
+              backgroundColor: currentColors.accent.primary,
+              color: currentColors.text.inverse,
+              opacity: searching || !quickSearch.trim() ? 0.6 : 1
             }}
           >
-            <div className="flex items-center gap-3 mb-2">
-              <Shield size={24} style={{ color: currentColors.accent.primary }} />
-              <h3 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
-                MISP Feeds
-              </h3>
-            </div>
-            <p className="text-sm" style={{ color: currentColors.text.secondary }}>
-              Teste e visualize feeds públicos de threat intelligence (IOCs). 15 feeds disponíveis incluindo DiamondFox, SSL Blacklist, OpenPhish.
-            </p>
+            {searching ? (
+              <RefreshCw size={18} className="animate-spin" />
+            ) : (
+              <Search size={18} />
+            )}
+            Search
           </button>
+        </div>
 
-          {/* IOC Enrichment Card */}
+        {/* Quick Search Result */}
+        {searchResult && (
+          <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: currentColors.bg.secondary }}>
+            {searchResult.error ? (
+              <div className="flex items-center gap-2 text-red-500">
+                <XCircle size={18} />
+                <span>{searchResult.error}</span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* MISP Result */}
+                <div className="flex items-start gap-3">
+                  {searchResult.misp?.found ? (
+                    <CheckCircle size={18} style={{ color: '#10b981' }} />
+                  ) : (
+                    <XCircle size={18} style={{ color: currentColors.text.muted }} />
+                  )}
+                  <div>
+                    <span className="font-medium" style={{ color: currentColors.text.primary }}>MISP: </span>
+                    <span style={{ color: searchResult.misp?.found ? '#10b981' : currentColors.text.secondary }}>
+                      {searchResult.misp?.found ? 'Found' : 'Not found'}
+                    </span>
+                    {searchResult.misp?.ioc && (
+                      <span className="ml-2 text-sm" style={{ color: currentColors.text.secondary }}>
+                        ({searchResult.misp.ioc.type} - {searchResult.misp.ioc.malware_family || 'Unknown'})
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* OTX Result */}
+                <div className="flex items-start gap-3">
+                  {searchResult.otx?.found ? (
+                    <CheckCircle size={18} style={{ color: '#10b981' }} />
+                  ) : (
+                    <XCircle size={18} style={{ color: currentColors.text.muted }} />
+                  )}
+                  <div>
+                    <span className="font-medium" style={{ color: currentColors.text.primary }}>OTX: </span>
+                    <span style={{ color: searchResult.otx?.found ? '#10b981' : currentColors.text.secondary }}>
+                      {searchResult.otx?.found ? `Found in ${searchResult.otx.pulses} pulses` : 'Not found'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* View Full Details */}
+                <button
+                  onClick={() => navigate('/cti/search')}
+                  className="mt-2 text-sm underline"
+                  style={{ color: currentColors.accent.primary }}
+                >
+                  View full analysis →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Stats Overview */}
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <RefreshCw size={24} className="animate-spin" style={{ color: currentColors.accent.primary }} />
+        </div>
+      ) : error ? (
+        <div className="text-center py-8">
+          <AlertTriangle size={32} style={{ color: currentColors.accent.error }} className="mx-auto mb-2" />
+          <p style={{ color: currentColors.text.secondary }}>{error}</p>
           <button
-            onClick={() => navigate('/cti/enrichment')}
-            className="p-4 rounded-lg border-2 text-left hover:shadow-lg transition-all"
-            style={{
-              backgroundColor: currentColors.bg.primary,
-              borderColor: currentColors.border.default,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = currentColors.accent.secondary;
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = currentColors.border.default;
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
+            onClick={loadStats}
+            className="mt-2 px-4 py-2 rounded text-sm"
+            style={{ backgroundColor: currentColors.accent.primary, color: currentColors.text.inverse }}
           >
-            <div className="flex items-center gap-3 mb-2">
-              <Brain size={24} style={{ color: currentColors.accent.secondary }} />
-              <h3 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
-                IOC Enrichment
-              </h3>
-            </div>
-            <p className="text-sm" style={{ color: currentColors.text.secondary }}>
-              Enriqueça IOCs com LLM e threat intelligence. MITRE ATT&CK mapping, detection methods, e análise contextual.
-            </p>
+            Retry
           </button>
-
-          {/* IOC Search Card */}
-          <button
-            onClick={() => navigate('/cti/search')}
-            className="p-4 rounded-lg border-2 text-left hover:shadow-lg transition-all"
-            style={{
-              backgroundColor: currentColors.bg.primary,
-              borderColor: currentColors.border.default,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#10b981';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = currentColors.border.default;
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
+        </div>
+      ) : stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div
+            className="p-4 rounded-lg"
+            style={{ backgroundColor: currentColors.bg.primary }}
           >
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-2 mb-2">
+              <Database size={20} style={{ color: currentColors.accent.primary }} />
+              <span className="text-sm" style={{ color: currentColors.text.secondary }}>Total IOCs</span>
+            </div>
+            <p className="text-3xl font-bold" style={{ color: currentColors.text.primary }}>
+              {stats.total_iocs.toLocaleString()}
+            </p>
+          </div>
+
+          <div
+            className="p-4 rounded-lg"
+            style={{ backgroundColor: currentColors.bg.primary }}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Shield size={20} style={{ color: currentColors.accent.secondary }} />
+              <span className="text-sm" style={{ color: currentColors.text.secondary }}>Active Feeds</span>
+            </div>
+            <p className="text-3xl font-bold" style={{ color: currentColors.text.primary }}>
+              {stats.feeds_count}
+            </p>
+          </div>
+
+          <div
+            className="p-4 rounded-lg"
+            style={{ backgroundColor: currentColors.bg.primary }}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <List size={20} style={{ color: '#f59e0b' }} />
+              <span className="text-sm" style={{ color: currentColors.text.secondary }}>IOC Types</span>
+            </div>
+            <p className="text-3xl font-bold" style={{ color: currentColors.text.primary }}>
+              {Object.keys(stats.by_type).length}
+            </p>
+          </div>
+
+          <div
+            className="p-4 rounded-lg"
+            style={{ backgroundColor: currentColors.bg.primary }}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <RefreshCw size={20} style={{ color: '#10b981' }} />
+              <span className="text-sm" style={{ color: currentColors.text.secondary }}>Last Sync</span>
+            </div>
+            <p className="text-lg font-medium" style={{ color: currentColors.text.primary }}>
+              {stats.last_sync ? new Date(stats.last_sync).toLocaleDateString() : 'Never'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* IOCs by Type */}
+      {stats && Object.keys(stats.by_type).length > 0 && (
+        <div
+          className="mb-6 p-4 rounded-lg"
+          style={{ backgroundColor: currentColors.bg.primary }}
+        >
+          <h3 className="text-lg font-semibold mb-4" style={{ color: currentColors.text.primary }}>
+            IOCs by Type
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {Object.entries(stats.by_type).map(([type, count]) => (
+              <button
+                key={type}
+                onClick={() => navigate('/cti/iocs')}
+                className="p-3 rounded-lg text-left hover:opacity-80 transition-opacity"
+                style={{ backgroundColor: currentColors.bg.secondary }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span>{getTypeIcon(type)}</span>
+                  <span className="text-sm font-medium" style={{ color: currentColors.text.primary }}>
+                    {type.toUpperCase()}
+                  </span>
+                </div>
+                <p className="text-xl font-bold" style={{ color: currentColors.accent.primary }}>
+                  {(count as number).toLocaleString()}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Navigation Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* IOC Search Card */}
+        <button
+          onClick={() => navigate('/cti/search')}
+          className="p-5 rounded-lg border-2 text-left hover:shadow-lg transition-all"
+          style={{
+            backgroundColor: currentColors.bg.primary,
+            borderColor: currentColors.border.default,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#10b981';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = currentColors.border.default;
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 rounded-lg" style={{ backgroundColor: '#10b98120' }}>
               <Search size={24} style={{ color: '#10b981' }} />
-              <h3 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
-                IOC Search
-              </h3>
             </div>
-            <p className="text-sm" style={{ color: currentColors.text.secondary }}>
-              Busque um IOC específico (IP, domain, URL, hash) no MISP e OTX.
-            </p>
-          </button>
+            <h3 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+              IOC Search
+            </h3>
+          </div>
+          <p className="text-sm" style={{ color: currentColors.text.secondary }}>
+            Search IOCs across MISP database, OTX (AlienVault), and get LLM-powered analysis with MITRE ATT&CK mapping.
+          </p>
+        </button>
 
-          {/* IOC Browser Card - NEW */}
-          <button
-            onClick={() => navigate('/cti/iocs')}
-            className="p-4 rounded-lg border-2 text-left hover:shadow-lg transition-all"
-            style={{
-              backgroundColor: currentColors.bg.primary,
-              borderColor: currentColors.border.default,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#f59e0b';
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = currentColors.border.default;
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div className="flex items-center gap-3 mb-2">
+        {/* IOC Browser Card */}
+        <button
+          onClick={() => navigate('/cti/iocs')}
+          className="p-5 rounded-lg border-2 text-left hover:shadow-lg transition-all"
+          style={{
+            backgroundColor: currentColors.bg.primary,
+            borderColor: currentColors.border.default,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#f59e0b';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = currentColors.border.default;
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 rounded-lg" style={{ backgroundColor: '#f59e0b20' }}>
               <List size={24} style={{ color: '#f59e0b' }} />
-              <h3 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
-                IOC Browser
-              </h3>
             </div>
-            <p className="text-sm" style={{ color: currentColors.text.secondary }}>
-              Navegue pelos IOCs salvos, filtrados por tipo (IP, domain, URL, hash).
-            </p>
-          </button>
-        </div>
-
-        {/* Stats Summary */}
-        {stats && (
-          <div
-            className="mt-4 p-4 rounded-lg flex gap-6 flex-wrap"
-            style={{ backgroundColor: currentColors.bg.primary }}
-          >
-            <div>
-              <p className="text-xs" style={{ color: currentColors.text.secondary }}>
-                Tactics
-              </p>
-              <p className="text-xl font-semibold" style={{ color: currentColors.text.primary }}>
-                {stats.total_tactics}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs" style={{ color: currentColors.text.secondary }}>
-                Techniques
-              </p>
-              <p className="text-xl font-semibold" style={{ color: currentColors.text.primary }}>
-                {stats.total_techniques}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs" style={{ color: currentColors.text.secondary }}>
-                Sub-techniques
-              </p>
-              <p className="text-xl font-semibold" style={{ color: currentColors.text.primary }}>
-                {stats.total_subtechniques}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs" style={{ color: currentColors.text.secondary }}>
-                Mitigations
-              </p>
-              <p className="text-xl font-semibold" style={{ color: currentColors.text.primary }}>
-                {stats.total_mitigations}
-              </p>
-            </div>
+            <h3 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+              IOC Browser
+            </h3>
           </div>
-        )}
-      </div>
+          <p className="text-sm" style={{ color: currentColors.text.secondary }}>
+            Browse and filter all saved IOCs by type (IP, domain, URL, hash), feed source, TLP level, and confidence.
+          </p>
+        </button>
 
-      {/* View Mode Toggle and Search */}
-      <div className="mb-4 flex items-center gap-4">
-        {/* View Mode Toggle */}
-        <div
-          className="flex rounded-lg overflow-hidden"
-          style={{ border: `1px solid ${currentColors.border.default}` }}
+        {/* MISP Feeds Card */}
+        <button
+          onClick={() => navigate('/cti/feeds')}
+          className="p-5 rounded-lg border-2 text-left hover:shadow-lg transition-all"
+          style={{
+            backgroundColor: currentColors.bg.primary,
+            borderColor: currentColors.border.default,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = currentColors.accent.primary;
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = currentColors.border.default;
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
         >
-          <button
-            onClick={() => setViewMode('map')}
-            className="px-4 py-2 flex items-center gap-2 text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: viewMode === 'map' ? currentColors.accent.primary : currentColors.bg.primary,
-              color: viewMode === 'map' ? currentColors.text.inverse : currentColors.text.primary
-            }}
-          >
-            <Globe size={16} />
-            Map View
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className="px-4 py-2 flex items-center gap-2 text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: viewMode === 'list' ? currentColors.accent.primary : currentColors.bg.primary,
-              color: viewMode === 'list' ? currentColors.text.inverse : currentColors.text.primary
-            }}
-          >
-            <LayoutGrid size={16} />
-            List View
-          </button>
-        </div>
-
-        {/* Search for highlighting on map */}
-        {viewMode === 'map' && (
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search
-                size={16}
-                className="absolute left-3 top-1/2 transform -translate-y-1/2"
-                style={{ color: currentColors.text.secondary }}
-              />
-              <input
-                type="text"
-                placeholder="Search actor to highlight on map..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg text-sm focus:outline-none focus:ring-2"
-                style={{
-                  backgroundColor: currentColors.bg.primary,
-                  color: currentColors.text.primary,
-                  border: `1px solid ${currentColors.border.default}`,
-                }}
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded hover:bg-opacity-80"
-                  style={{ color: currentColors.text.muted }}
-                >
-                  ×
-                </button>
-              )}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 rounded-lg" style={{ backgroundColor: `${currentColors.accent.primary}20` }}>
+              <Shield size={24} style={{ color: currentColors.accent.primary }} />
             </div>
+            <h3 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+              MISP Feeds
+            </h3>
           </div>
-        )}
-      </div>
+          <p className="text-sm" style={{ color: currentColors.text.secondary }}>
+            Test and preview public threat intelligence feeds. 15+ feeds including DiamondFox, SSL Blacklist, URLhaus.
+          </p>
+        </button>
 
-      {/* Map View */}
-      {viewMode === 'map' && (
-        <div style={{ height: 'calc(100vh - 380px)' }}>
-          <WorldMap
-            onActorClick={handleActorClick}
-            highlightedActor={searchQuery || null}
-            className="h-full"
-          />
-        </div>
-      )}
-
-      {/* List View: Two-Column Layout: Actors List + Dynamic Right Panel */}
-      {viewMode === 'list' && (
-        <div
-          className={rightPanelView !== 'none' ? "grid grid-cols-[400px_1fr] gap-4" : "flex"}
-          style={{ height: 'calc(100vh - 380px)' }}
+        {/* IOC Enrichment Card */}
+        <button
+          onClick={() => navigate('/cti/enrichment')}
+          className="p-5 rounded-lg border-2 text-left hover:shadow-lg transition-all"
+          style={{
+            backgroundColor: currentColors.bg.primary,
+            borderColor: currentColors.border.default,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = currentColors.accent.secondary;
+            e.currentTarget.style.transform = 'translateY(-2px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = currentColors.border.default;
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
         >
-          {/* Column 1: Threat Actors (Always Visible) */}
-          <div
-            className="rounded-lg p-4 flex flex-col overflow-hidden"
-            style={{
-              backgroundColor: currentColors.bg.primary,
-              width: rightPanelView !== 'none' ? 'auto' : '400px',
-              height: '100%'
-            }}
-          >
-            <h2 className="text-lg font-semibold mb-4" style={{ color: currentColors.text.primary }}>
-              Threat Actors
-            </h2>
-            <div className="flex-1 overflow-hidden">
-              <ActorsList
-                selectedActors={[]}
-                onActorSelect={() => {}}
-                onActorClick={handleActorClick}
-              />
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 rounded-lg" style={{ backgroundColor: `${currentColors.accent.secondary}20` }}>
+              <Brain size={24} style={{ color: currentColors.accent.secondary }} />
             </div>
+            <h3 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
+              IOC Enrichment
+            </h3>
           </div>
-
-          {/* Column 2: Actor Details Panel */}
-          {rightPanelView === 'details' && selectedActor && (
-            <ActorDetailsPanel
-              actorName={selectedActor}
-              onClose={handleClosePanel}
-              onTechniquesLoaded={handleTechniquesLoaded}
-              onViewMatrix={handleViewMatrix}
-            />
-          )}
-
-          {/* Column 2: MITRE ATT&CK Matrix */}
-          {rightPanelView === 'matrix' && highlightedTechniques.length > 0 && (
-            <div
-              className="rounded-lg p-4 flex flex-col"
-              style={{ backgroundColor: currentColors.bg.primary, minWidth: 0 }}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold" style={{ color: currentColors.text.primary }}>
-                  MITRE ATT&CK Matrix - {highlightedTechniques.length} Techniques
-                </h2>
-                <button
-                  onClick={() => setRightPanelView('details')}
-                  className="px-3 py-1 rounded text-sm hover:opacity-80"
-                  style={{ backgroundColor: currentColors.bg.secondary, color: currentColors.text.primary }}
-                >
-                  Back to Details
-                </button>
-              </div>
-              <div className="flex-1 overflow-auto">
-                <AttackMatrix highlightedTechniques={highlightedTechniques} />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Actor Details Modal for Map View */}
-      {viewMode === 'map' && selectedActor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div
-            className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-lg shadow-2xl"
-            style={{ backgroundColor: currentColors.bg.primary }}
-          >
-            <ActorDetailsPanel
-              actorName={selectedActor}
-              onClose={handleClosePanel}
-              onTechniquesLoaded={handleTechniquesLoaded}
-              onViewMatrix={handleViewMatrix}
-            />
-          </div>
-        </div>
-      )}
+          <p className="text-sm" style={{ color: currentColors.text.secondary }}>
+            Batch enrich IOCs with LLM analysis. Get threat type, severity, MITRE techniques, and detection methods.
+          </p>
+        </button>
+      </div>
     </div>
   );
 };

@@ -22,6 +22,7 @@ import MISPFeedsPage from '@pages/cti/MISPFeedsPage'
 import IOCEnrichmentPage from '@pages/cti/IOCEnrichmentPage'
 import IOCSearchPage from '@pages/cti/IOCSearchPage'
 import IOCBrowserPage from '@pages/cti/IOCBrowserPage'
+import APTDashboard from '@pages/apt/APTDashboard'
 import CredentialsPage from '@pages/CredentialsPage'
 import DataLakePage from '@pages/DataLakePage'
 import { Header } from './components/Header'
@@ -140,7 +141,10 @@ function App() {
         <Route path="/credentials" element={<ProtectedRoute><CredentialsPage /></ProtectedRoute>} />
         <Route path="/datalake" element={<ProtectedRoute><DataLakePage /></ProtectedRoute>} />
 
-        {/* CTI Dashboard */}
+        {/* APT Dashboard - Threat Actors Map */}
+        <Route path="/apt" element={<ProtectedRoute><APTDashboard /></ProtectedRoute>} />
+
+        {/* CTI Dashboard - IOC Intelligence */}
         <Route path="/cti" element={<ProtectedRoute><CTIDashboard /></ProtectedRoute>} />
         <Route path="/cti/feeds" element={<ProtectedRoute><MISPFeedsPage /></ProtectedRoute>} />
         <Route path="/cti/enrichment" element={<ProtectedRoute><IOCEnrichmentPage /></ProtectedRoute>} />
