@@ -1166,7 +1166,18 @@ class MISPFeedService:
                 # Exemplo: hxxp://00bot.asterios.ws/fox/,2018-07-02 16:31:02,75b6ce7...
                 parts = line.split(',', 2)
                 c2_url = parts[0].strip() if parts else line
-                timestamp = parts[1].strip() if len(parts) > 1 else None
+                timestamp_str = parts[1].strip() if len(parts) > 1 else None
+
+                # Parse timestamp to datetime
+                first_seen = None
+                if timestamp_str:
+                    try:
+                        first_seen = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                    except:
+                        try:
+                            first_seen = datetime.strptime(timestamp_str, "%Y-%m-%d")
+                        except:
+                            first_seen = None
 
                 # Defang URL (hxxp → http) se necessário para armazenamento
                 # Mas mantém o valor original para fidelidade ao feed
@@ -1180,7 +1191,7 @@ class MISPFeedService:
                     "malware_family": "DiamondFox",
                     "threat_actor": None,
                     "tlp": "white",
-                    "first_seen": timestamp if timestamp else None,
+                    "first_seen": first_seen,
                     "confidence": "high",  # Unit42 é fonte confiável
                     "to_ids": True,
                 }

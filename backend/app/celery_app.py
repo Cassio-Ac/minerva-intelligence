@@ -57,10 +57,10 @@ celery_app.conf.update(
             "schedule": crontab(minute=0, hour=2),  # 02:00 AM
         },
 
-        # MISP feeds sync - 4x per day (00:00, 06:00, 12:00, 18:00 Brazil time)
+        # MISP feeds sync - every 2 hours
         "sync-misp-feeds": {
             "task": "app.tasks.misp_tasks.sync_all_misp_feeds",
-            "schedule": crontab(minute=0, hour="0,6,12,18"),  # Every 6 hours
+            "schedule": crontab(minute=0, hour="*/2"),  # Every 2 hours
         },
 
         # OTX pulse sync - 2x per day (09:00 and 21:00 Brazil time)

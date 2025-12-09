@@ -462,3 +462,64 @@ async def sync_specific_feed(
         "iocs_found": len(iocs),
         "iocs_imported": imported_count,
     }
+
+
+@router.post("/feeds/sync-all", summary="Sync all MISP feeds (async task)")
+async def sync_all_feeds(
+    quick: bool = Query(default=True, description="Quick sync with lower limits (faster)"),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Trigger async sync of ALL available MISP feeds
+
+    **Modes:**
+    - `quick=true` (default): Quick sync with ~500-1000 IOCs per feed (faster)
+    - `quick=false`: Full sync with up to 5000 IOCs per feed (slower but more complete)
+
+    **Note:** This triggers a Celery background task. Check logs for progress.
+    """
+    from app.tasks.misp_tasks import sync_all_misp_feeds, quick_sync_all_feeds
+
+    if quick:
+        task = quick_sync_all_feeds.delay()
+        return {
+            "status": "queued",
+            "task_id": task.id,
+            "mode": "quick",
+            "message": "Quick MISP sync task queued. Check Celery logs for progress."
+        }
+    else:
+        task = sync_all_misp_feeds.delay()
+        return {
+            "status": "queued",
+            "task_id": task.id,
+            "mode": "full",
+            "message": "Full MISP sync task queued. Check Celery logs for progress."
+        }
+
+
+@router.get("/feeds/sync-status", summary="Get sync schedule info")
+async def get_sync_status(
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Get information about the automatic sync schedule
+
+    MISP feeds are automatically synced every 2 hours.
+    """
+    from app.cti.services.misp_feed_service import MISPFeedService
+
+    service = MISPFeedService()
+    available_feeds = [
+        {"id": feed_id, "name": feed_info["name"], "requires_auth": feed_info.get("requires_auth", False)}
+        for feed_id, feed_info in service.FEEDS.items()
+    ]
+
+    return {
+        "schedule": "Every 2 hours (at minute 0)",
+        "cron": "0 */2 * * *",
+        "timezone": "America/Sao_Paulo",
+        "feeds_count": len(available_feeds),
+        "feeds": available_feeds,
+        "note": "Feeds requiring authentication (OTX) are handled separately"
+    }
