@@ -16,7 +16,7 @@ celery_app = Celery(
     "minerva",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["app.tasks.rss_tasks", "app.tasks.malpedia_tasks", "app.tasks.misp_tasks", "app.tasks.otx_tasks", "app.tasks.caveiratech_tasks"]
+    include=["app.tasks.rss_tasks", "app.tasks.malpedia_tasks", "app.tasks.misp_tasks", "app.tasks.otx_tasks", "app.tasks.caveiratech_tasks", "app.tasks.signature_base_tasks"]
 )
 
 # Celery configuration
@@ -92,6 +92,18 @@ celery_app.conf.update(
             "task": "app.tasks.caveiratech_tasks.sync_caveiratech",
             "schedule": crontab(minute=0, hour="10,22"),  # 10:00 and 22:00
             "kwargs": {"max_pages": 10},  # Incremental sync (latest 10 pages)
+        },
+
+        # Signature Base YARA rules - 1x per week (Sunday 03:00 Brazil time)
+        "sync-signature-base-yara": {
+            "task": "app.tasks.signature_base_tasks.sync_signature_base_yara",
+            "schedule": crontab(minute=0, hour=3, day_of_week=0),  # Sunday 03:00
+        },
+
+        # Signature Base IOCs - 1x per week (Sunday 04:00 Brazil time)
+        "sync-signature-base-iocs": {
+            "task": "app.tasks.signature_base_tasks.sync_signature_base_iocs",
+            "schedule": crontab(minute=0, hour=4, day_of_week=0),  # Sunday 04:00
         },
     },
 )
